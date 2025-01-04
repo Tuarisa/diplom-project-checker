@@ -1,0 +1,68 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+// Get commit message from file
+const commitMsgFile = process.argv[2];
+const commitMsg = fs.readFileSync(commitMsgFile, 'utf8');
+
+// Rules for commit messages
+const rules = {
+    // Maximum message length
+    maxLength: 60,
+    
+    // Prefixes for commit types
+    allowedTypes: [
+        'feat',     // new feature
+        'fix',      // bug fix
+        'docs',     // documentation
+        'style',    // formatting, missing semicolons, etc.
+        'refactor', // code change that neither fixes a bug nor adds a feature
+        'test',     // adding tests
+        'chore',    // maintenance
+        'init',     // initial commit
+    ],
+    
+    // Message format: type: description
+    format: /^(feat|fix|docs|style|refactor|test|chore|init)(\(.+\))?: .+/,
+    
+    // Only allow English characters and common symbols
+    englishOnly: /^[a-zA-Z0-9\s:(),.-]+$/
+};
+
+// Check message length
+if (commitMsg.length > rules.maxLength) {
+    console.error(`❌ Commit message too long (${commitMsg.length} > ${rules.maxLength})`);
+    process.exit(1);
+}
+
+// Check message format
+if (!rules.format.test(commitMsg)) {
+    console.error('❌ Invalid commit message format');
+    console.error('Format should be: type: description');
+    console.error('Available types:', rules.allowedTypes.join(', '));
+    process.exit(1);
+}
+
+// Check for English characters only
+if (!rules.englishOnly.test(commitMsg)) {
+    console.error('❌ Commit message must contain only English characters');
+    console.error('Use only letters a-z, A-Z, numbers, and basic punctuation');
+    process.exit(1);
+}
+
+// Check for imperative mood
+const description = commitMsg.split(': ')[1];
+const firstWord = description.split(' ')[0].toLowerCase();
+
+// List of past tense endings
+const pastTenseEndings = ['ed'];
+if (pastTenseEndings.some(ending => firstWord.endsWith(ending))) {
+    console.error('❌ Use imperative mood in commit message');
+    console.error('Example: "fix: add validation" instead of "fixed: added validation"');
+    process.exit(1);
+}
+
+console.log('✅ Commit message meets requirements');
+process.exit(0); 

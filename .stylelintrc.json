@@ -1,0 +1,32 @@
+{
+  "extends": "stylelint-config-standard-scss",
+  "plugins": ["stylelint-order"],
+  "defaultSeverity": "error",
+  "rules": {
+    "no-duplicate-selectors": true,
+    "declaration-no-important": true,
+    "selector-max-id": 0,
+    "max-nesting-depth": [2, {
+      "ignore": ["blockless-at-rules", "pseudo-classes"]
+    }],
+    "selector-max-type": [2, {
+      "ignore": ["child", "descendant", "compounded"],
+      "ignoreTypes": ["body", "ul", "ol", "li", "a", "img"]
+    }],
+    "order/properties-alphabetical-order": true,
+    "selector-class-pattern": "^[a-z]+(-[a-z]+)*(__[a-z]+(-[a-z]+)*)?(--[a-z]+(-[a-z]+)*)?$",
+    "custom-property-pattern": "^[a-z]+(-[a-z]+)*$",
+    "color-hex-length": "long",
+    "color-named": "never",
+    "declaration-block-no-duplicate-properties": true,
+    "block-no-empty": true,
+    "property-no-vendor-prefix": true,
+    "value-no-vendor-prefix": true,
+    "selector-no-vendor-prefix": true,
+    "media-feature-name-no-vendor-prefix": true,
+    "at-rule-no-vendor-prefix": true,
+    "no-descending-specificity": null,
+    "font-family-name-quotes": "always-where-recommended"
+  },
+  "fix": true
+} 
