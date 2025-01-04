@@ -91,9 +91,10 @@ async function optimizeHtml(content) {
         ...prettierConfig,
         parser: 'html',
         printWidth: 120,
-        htmlWhitespaceSensitivity: 'ignore',
+        htmlWhitespaceSensitivity: 'css',
         bracketSameLine: true,
-        singleAttributePerLine: false
+        singleAttributePerLine: false,
+        bracketSpacing: false
     });
     
     // Replace style paths with minified versions from assets
