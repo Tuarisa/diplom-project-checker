@@ -17,7 +17,7 @@
     "optimize": "yarn optimize:html && yarn optimize:styles && yarn optimize:images",
     "sass": "node -e \"const { WORKING_DIR } = require('./utils/paths'); require('child_process').execSync(`sass ${WORKING_DIR}/styles/style.scss ${WORKING_DIR}/assets/styles/style.css && cleancss -o ${WORKING_DIR}/assets/styles/style.min.css ${WORKING_DIR}/assets/styles/style.css && cleancss -o ${WORKING_DIR}/assets/styles/normalize.min.css ${WORKING_DIR}/styles/normalize.css`, {stdio: 'inherit'})\"",
     "sass:watch": "node -e \"const { WORKING_DIR } = require('./utils/paths'); const path = require('path'); process.chdir(WORKING_DIR); require('child_process').spawn('sass', ['--watch', 'styles/style.scss', 'assets/styles/style.css'], {stdio: 'inherit'})\"",
-    "format:styles": "node -e \"const { WORKING_DIR } = require('./utils/paths'); require('child_process').execSync(`stylelint \\\"${WORKING_DIR}/styles/**/*.scss\\\" --fix --config .stylelintrc.json`, {stdio: 'inherit'})\"",
+    "format:styles": "node utils/format-styles.js",
     "start": "concurrently \"yarn sass:watch\" \"node utils/server.js\"",
     "format": "node utils/format.js",
     "setup-git": "node utils/setup-git-hooks.js",
