@@ -1,80 +1,84 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
+const { exec } = require('child_process');
+const { promisify } = require('util');
 const { WORKING_DIR } = require('./paths');
 
-function setupGitHooks() {
+const execAsync = promisify(exec);
+
+async function setupGitHooks() {
     try {
         console.log('\n🔧 Setting up Git hooks...\n');
 
         // Проверяем существование WORKING_DIR
-        if (!fs.existsSync(WORKING_DIR)) {
+        try {
+            await fs.access(WORKING_DIR);
+        } catch {
             console.error('❌ Working directory does not exist:', WORKING_DIR);
             process.exit(1);
         }
 
-        // Путь к хукам в проверяемом проекте
-        const gitDir = path.join(WORKING_DIR, '.git');
-        const hooksDir = path.join(gitDir, 'hooks');
-        const commitMsgPath = path.join(hooksDir, 'commit-msg');
+        // Определяем директорию .git
+        let gitDir;
+        try {
+            process.chdir(WORKING_DIR);
+            const { stdout } = await execAsync('git rev-parse --git-dir');
+            gitDir = stdout.trim();
+            console.log('✅ Git repository found:', gitDir);
+        } catch (error) {
+            console.log('🔄 Initializing git repository...');
+            await execAsync('git init');
+            gitDir = '.git';
+            console.log('✅ Git repository initialized');
+        }
 
-        // Путь к исходному хуку в директории чекера
+        const gitHooksDir = path.join(WORKING_DIR, gitDir, 'hooks');
         const sourceHookPath = path.join(__dirname, 'git-hooks', 'commit-msg');
+        const hookPath = path.join(gitHooksDir, 'commit-msg');
 
         console.log('Source hook path:', sourceHookPath);
-        console.log('Target hook path:', commitMsgPath);
+        console.log('Target hook path:', hookPath);
 
         // Проверяем существование исходного хука
-        if (!fs.existsSync(sourceHookPath)) {
+        try {
+            await fs.access(sourceHookPath);
+            console.log('✅ Source hook file found');
+        } catch {
             console.error('❌ Source hook file not found:', sourceHookPath);
             process.exit(1);
         }
 
-        // Проверяем существование .git директории
-        if (!fs.existsSync(gitDir)) {
-            console.error('❌ Not a Git repository:', WORKING_DIR);
-            process.exit(1);
-        }
-
-        // Создаем директорию hooks и все промежуточные директории
+        // Создаем директорию hooks, если её нет
         try {
-            if (!fs.existsSync(hooksDir)) {
-                fs.mkdirSync(hooksDir, { recursive: true });
-                console.log('✅ Created hooks directory:', hooksDir);
-            } else {
-                console.log('✅ Hooks directory exists:', hooksDir);
-            }
+            await fs.mkdir(gitHooksDir, { recursive: true });
+            console.log('✅ Hooks directory ready:', gitHooksDir);
         } catch (error) {
-            console.error('❌ Error with hooks directory:', error.message);
-            process.exit(1);
-        }
-
-        // Удаляем существующий хук, если он есть
-        if (fs.existsSync(commitMsgPath)) {
-            try {
-                fs.unlinkSync(commitMsgPath);
-                console.log('✅ Removed existing hook');
-            } catch (error) {
-                console.error('❌ Error removing existing hook:', error.message);
+            if (error.code !== 'EEXIST') {
+                console.error('❌ Error creating hooks directory:', error.message);
                 process.exit(1);
             }
         }
 
-        // Копируем commit-msg хук
+        // Проверяем существующий хук
         try {
-            const commitMsgContent = fs.readFileSync(sourceHookPath, 'utf8');
-            fs.writeFileSync(commitMsgPath, commitMsgContent, { mode: 0o755, flag: 'w' });
-            
-            // Проверяем, что файл создался и имеет правильные права
-            const stats = fs.statSync(commitMsgPath);
-            if ((stats.mode & 0o777) !== 0o755) {
-                fs.chmodSync(commitMsgPath, 0o755);
+            const stats = await fs.lstat(hookPath);
+            if (stats.isSymbolicLink()) {
+                await fs.unlink(hookPath);
+                console.log('🔄 Removed existing symbolic link');
+            } else if (stats.isFile()) {
+                await fs.rename(hookPath, `${hookPath}.backup`);
+                console.log('🔄 Existing hook saved as .backup');
             }
-            
-            console.log('✅ Installed commit-msg hook to:', commitMsgPath);
+        } catch {}
+
+        // Создаем символическую ссылку
+        try {
+            const relativePath = path.relative(gitHooksDir, sourceHookPath);
+            await fs.symlink(relativePath, hookPath);
+            await fs.chmod(hookPath, 0o755);
+            console.log('✅ Created symbolic link to hook');
         } catch (error) {
-            console.error('❌ Error installing commit-msg hook:', error.message);
-            console.error('Source:', sourceHookPath);
-            console.error('Target:', commitMsgPath);
+            console.error('❌ Error creating symbolic link:', error.message);
             process.exit(1);
         }
 
