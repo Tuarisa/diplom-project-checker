@@ -32,12 +32,27 @@ async function setupGitHooks() {
             console.log('✅ Git repository initialized');
         }
 
-        const gitHooksDir = path.join(WORKING_DIR, gitDir, 'hooks');
+        // Создаем директорию для хуков в проекте
+        const projectHooksDir = path.join(WORKING_DIR, 'utils', 'git-hooks');
+        try {
+            await fs.mkdir(projectHooksDir, { recursive: true });
+            console.log('✅ Project hooks directory ready:', projectHooksDir);
+        } catch (error) {
+            if (error.code !== 'EEXIST') {
+                console.error('❌ Error creating project hooks directory:', error.message);
+                process.exit(1);
+            }
+        }
+
+        // Копируем хук в директорию проекта
         const sourceHookPath = path.join(__dirname, 'git-hooks', 'commit-msg');
+        const projectHookPath = path.join(projectHooksDir, 'commit-msg');
+        const gitHooksDir = path.join(WORKING_DIR, gitDir, 'hooks');
         const hookPath = path.join(gitHooksDir, 'commit-msg');
 
         console.log('Source hook path:', sourceHookPath);
-        console.log('Target hook path:', hookPath);
+        console.log('Project hook path:', projectHookPath);
+        console.log('Git hook path:', hookPath);
 
         // Проверяем существование исходного хука
         try {
@@ -48,13 +63,23 @@ async function setupGitHooks() {
             process.exit(1);
         }
 
-        // Создаем директорию hooks, если её нет
+        // Копируем хук в директорию проекта
+        try {
+            const hookContent = await fs.readFile(sourceHookPath, 'utf8');
+            await fs.writeFile(projectHookPath, hookContent, { mode: 0o755 });
+            console.log('✅ Hook copied to project directory');
+        } catch (error) {
+            console.error('❌ Error copying hook to project:', error.message);
+            process.exit(1);
+        }
+
+        // Создаем директорию hooks в .git, если её нет
         try {
             await fs.mkdir(gitHooksDir, { recursive: true });
-            console.log('✅ Hooks directory ready:', gitHooksDir);
+            console.log('✅ Git hooks directory ready:', gitHooksDir);
         } catch (error) {
             if (error.code !== 'EEXIST') {
-                console.error('❌ Error creating hooks directory:', error.message);
+                console.error('❌ Error creating git hooks directory:', error.message);
                 process.exit(1);
             }
         }
@@ -71,12 +96,12 @@ async function setupGitHooks() {
             }
         } catch {}
 
-        // Создаем символическую ссылку
+        // Создаем символическую ссылку на хук в проекте
         try {
-            const relativePath = path.relative(gitHooksDir, sourceHookPath);
+            const relativePath = path.relative(gitHooksDir, projectHookPath);
             await fs.symlink(relativePath, hookPath);
             await fs.chmod(hookPath, 0o755);
-            console.log('✅ Created symbolic link to hook');
+            console.log('✅ Created symbolic link to project hook');
         } catch (error) {
             console.error('❌ Error creating symbolic link:', error.message);
             process.exit(1);
