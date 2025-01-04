@@ -1,15 +1,13 @@
-const fs = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 const { WORKING_DIR } = require('./paths');
 
-async function setupGitHooks() {
+function setupGitHooks() {
     try {
         console.log('\n🔧 Setting up Git hooks...\n');
 
         // Проверяем существование WORKING_DIR
-        try {
-            await fs.access(WORKING_DIR);
-        } catch {
+        if (!fs.existsSync(WORKING_DIR)) {
             console.error('❌ Working directory does not exist:', WORKING_DIR);
             process.exit(1);
         }
@@ -26,24 +24,20 @@ async function setupGitHooks() {
         console.log('Target hook path:', commitMsgPath);
 
         // Проверяем существование исходного хука
-        try {
-            await fs.access(sourceHookPath);
-        } catch {
+        if (!fs.existsSync(sourceHookPath)) {
             console.error('❌ Source hook file not found:', sourceHookPath);
             process.exit(1);
         }
 
         // Проверяем существование .git директории
-        try {
-            await fs.access(gitDir);
-        } catch {
+        if (!fs.existsSync(gitDir)) {
             console.error('❌ Not a Git repository:', WORKING_DIR);
             process.exit(1);
         }
 
         // Создаем директорию hooks и все промежуточные директории
         try {
-            await fs.mkdir(hooksDir, { recursive: true });
+            fs.mkdirSync(hooksDir, { recursive: true });
             console.log('✅ Hooks directory ready:', hooksDir);
         } catch (error) {
             console.error('❌ Error creating hooks directory:', error.message);
@@ -52,8 +46,8 @@ async function setupGitHooks() {
 
         // Копируем commit-msg хук
         try {
-            const commitMsgContent = await fs.readFile(sourceHookPath, 'utf8');
-            await fs.writeFile(commitMsgPath, commitMsgContent, { mode: 0o755 });
+            const commitMsgContent = fs.readFileSync(sourceHookPath, 'utf8');
+            fs.writeFileSync(commitMsgPath, commitMsgContent, { mode: 0o755 });
             console.log('✅ Installed commit-msg hook to:', commitMsgPath);
         } catch (error) {
             console.error('❌ Error installing commit-msg hook:', error.message);
