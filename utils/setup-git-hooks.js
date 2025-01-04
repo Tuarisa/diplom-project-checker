@@ -41,12 +41,13 @@ async function setupGitHooks() {
             process.exit(1);
         }
 
-        // Создаем директорию hooks, если её нет
+        // Создаем директорию hooks и все промежуточные директории
         try {
-            await fs.access(hooksDir);
-        } catch {
             await fs.mkdir(hooksDir, { recursive: true });
-            console.log('✅ Created hooks directory:', hooksDir);
+            console.log('✅ Hooks directory ready:', hooksDir);
+        } catch (error) {
+            console.error('❌ Error creating hooks directory:', error.message);
+            process.exit(1);
         }
 
         // Копируем commit-msg хук
