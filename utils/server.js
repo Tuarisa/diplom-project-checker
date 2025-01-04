@@ -28,12 +28,29 @@ liveReloadServer.watch(watchDirs);
 const app = express();
 const port = 3000;
 
+// Функция для компиляции SCSS
+async function compileSass() {
+    try {
+        const assetsStylesDir = path.join(WORKING_DIR, 'assets', 'styles');
+        await fs.mkdir(assetsStylesDir, { recursive: true });
+        
+        // Компилируем SCSS в CSS
+        execSync(`sass ${path.join(WORKING_DIR, 'styles/style.scss')} ${path.join(WORKING_DIR, 'assets/styles/style.css')}`, {
+            stdio: 'inherit'
+        });
+        
+        console.log('✨ SCSS compiled successfully!');
+        return true;
+    } catch (error) {
+        console.error('Error compiling SCSS:', error.message);
+        return false;
+    }
+}
+
 // Функция для минификации CSS
 async function minifyCSS() {
     try {
         const assetsStylesDir = path.join(WORKING_DIR, 'assets', 'styles');
-        
-        // Создаем директорию assets/styles, если её нет
         await fs.mkdir(assetsStylesDir, { recursive: true });
         
         // Минифицируем style.css
@@ -85,21 +102,23 @@ watch(WORKING_DIR, { recursive: false }, (eventType, filename) => {
 });
 
 // Watch for changes in SCSS files
-watch(path.join(WORKING_DIR, 'styles'), { recursive: true }, (eventType, filename) => {
+watch(path.join(WORKING_DIR, 'styles'), { recursive: true }, async (eventType, filename) => {
     if (filename && filename.endsWith('.scss')) {
         console.log('SCSS file changes detected, recompiling...');
-        try {
-            execSync('yarn sass', { stdio: 'inherit' });
-            console.log('SCSS compiled successfully');
-            minifyCSS();
-        } catch (error) {
-            console.error('Error compiling SCSS:', error.message);
+        const compiled = await compileSass();
+        if (compiled) {
+            await minifyCSS();
         }
     }
 });
 
-// Минифицируем CSS при запуске сервера
-minifyCSS();
+// Инициализация: компилируем SCSS и минифицируем CSS при запуске
+(async () => {
+    const compiled = await compileSass();
+    if (compiled) {
+        await minifyCSS();
+    }
+})();
 
 // Запускаем сервер
 app.listen(port, () => {
