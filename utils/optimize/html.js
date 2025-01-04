@@ -102,9 +102,11 @@ async function optimizeHtml(content) {
         // Обрабатываем только link и meta теги
         content = content.replace(/<(link|meta)[^>]+>/g, (tag) => {
             // Убираем переносы строк и лишние пробелы
-            return tag.replace(/\s+/g, ' ').trim() + '\n';
+            return tag.replace(/\s+/g, ' ').trim();
         });
-        return startTag + '\n' + content + endTag;
+        // Разделяем теги одним переносом строки
+        content = content.split(/\s*\n\s*/).filter(Boolean).join('\n    ');
+        return `${startTag}\n    ${content}\n${endTag}`;
     });
     
     // Replace style paths with minified versions from assets
