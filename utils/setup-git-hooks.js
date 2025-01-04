@@ -22,7 +22,8 @@ async function setupGitHooks() {
 
         const gitDir = path.join(WORKING_DIR, '.git');
         const hooksDir = path.join(gitDir, 'hooks');
-        const localCommitMsgPath = path.join(__dirname, 'commit-msg');
+        const commitMsgPath = path.join(hooksDir, 'commit-msg');
+        const preCommitPath = path.join(hooksDir, 'pre-commit');
 
         // Проверяем существование .git директории
         try {
@@ -40,22 +41,24 @@ async function setupGitHooks() {
             console.log('✅ Created hooks directory');
         }
 
-        // Устанавливаем commit-msg хук
-        const commitMsgPath = path.join(hooksDir, 'commit-msg');
+        // Копируем commit-msg хук из текущей директории
         try {
-            const commitMsgContent = await fs.readFile(localCommitMsgPath, 'utf8');
-            await fs.writeFile(commitMsgPath, commitMsgContent);
-            await fs.chmod(commitMsgPath, 0o755);
+            const commitMsgContent = await fs.readFile(path.join(__dirname, 'commit-msg'), 'utf8');
+            await fs.writeFile(commitMsgPath, commitMsgContent, { mode: 0o755 });
             console.log('✅ Installed commit-msg hook');
         } catch (error) {
             console.error('❌ Error installing commit-msg hook:', error.message);
+            process.exit(1);
         }
 
         // Создаем pre-commit хук
-        const preCommitPath = path.join(hooksDir, 'pre-commit');
-        await fs.writeFile(preCommitPath, PRE_COMMIT_HOOK);
-        await fs.chmod(preCommitPath, 0o755);
-        console.log('✅ Installed pre-commit hook');
+        try {
+            await fs.writeFile(preCommitPath, PRE_COMMIT_HOOK, { mode: 0o755 });
+            console.log('✅ Installed pre-commit hook');
+        } catch (error) {
+            console.error('❌ Error installing pre-commit hook:', error.message);
+            process.exit(1);
+        }
 
         console.log('\n✨ Git hooks setup completed');
         console.log('\nThe following hooks are now active:');
