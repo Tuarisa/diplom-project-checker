@@ -9,9 +9,18 @@ const { WORKING_DIR } = require('./paths');
 const app = express();
 const port = 3000;
 
-// Создаем сервер livereload
-const liveReloadServer = livereload.createServer();
+// Создаем сервер livereload с игнорированием минифицированных файлов
+const liveReloadServer = livereload.createServer({
+    exclusions: ['**/*.min.css', '**/node_modules/**']
+});
 liveReloadServer.watch(WORKING_DIR);
+
+// Добавляем debounce для предотвращения множественных вызовов
+let minificationTimeout;
+function debounceMinification(func, wait = 1000) {
+    clearTimeout(minificationTimeout);
+    minificationTimeout = setTimeout(func, wait);
+}
 
 // Функция для минификации CSS
 async function minifyCSS() {
@@ -64,8 +73,12 @@ liveReloadServer.server.once("connection", () => {
 
 // Добавляем обработчик изменений для CSS файлов
 liveReloadServer.watcher.on('change', async (file) => {
+    // Игнорируем минифицированные файлы
+    if (file.endsWith('.min.css')) return;
+    
+    // Проверяем только CSS и SCSS файлы
     if (file.endsWith('.css') || file.endsWith('.scss')) {
-        await minifyCSS();
+        debounceMinification(minifyCSS);
     }
 });
 
