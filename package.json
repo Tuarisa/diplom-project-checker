@@ -19,7 +19,7 @@
     "sass:watch": "node -e \"const { WORKING_DIR } = require('./utils/paths'); const path = require('path'); process.chdir(WORKING_DIR); require('child_process').spawn('sass', ['--watch', 'styles/style.scss', 'assets/styles/style.css'], {stdio: 'inherit'})\"",
     "format:styles": "node -e \"const { WORKING_DIR } = require('./utils/paths'); require('child_process').execSync(`stylelint \\\"${WORKING_DIR}/styles/**/*.scss\\\" --fix --config .stylelintrc.json`, {stdio: 'inherit'})\"",
     "start": "concurrently \"yarn sass:watch\" \"node utils/server.js\"",
-    "format": "node -e \"const { WORKING_DIR } = require('./utils/paths'); require('child_process').execSync(`prettier --write \\\"${WORKING_DIR}/styles/**/*.scss\\\"`, {stdio: 'inherit'})\"",
+    "format": "node utils/format.js",
     "setup-git": "node utils/setup-git-hooks.js",
     "cleanup": "node utils/cleanup-repo.js"
   },
