@@ -21,7 +21,8 @@
     "start": "concurrently \"yarn sass:watch\" \"node utils/server.js\"",
     "format": "node utils/format.js",
     "setup-git": "node utils/setup-git-hooks.js",
-    "cleanup": "node utils/cleanup-repo.js"
+    "cleanup": "node utils/cleanup-repo.js",
+    "setup": "yarn sync && yarn cleanup && yarn setup-git && yarn validate"
   },
   "dependencies": {
     "browser-sync": "^2.29.3",
