@@ -6,9 +6,13 @@ async function setupGitHooks() {
     try {
         console.log('\n🔧 Setting up Git hooks...\n');
 
+        // Путь к хукам в проверяемом проекте
         const gitDir = path.join(WORKING_DIR, '.git');
         const hooksDir = path.join(gitDir, 'hooks');
         const commitMsgPath = path.join(hooksDir, 'commit-msg');
+
+        // Путь к исходному хуку в текущей директории
+        const sourceHookPath = path.join(__dirname, 'git-hooks', 'commit-msg');
 
         // Проверяем существование .git директории
         try {
@@ -26,9 +30,9 @@ async function setupGitHooks() {
             console.log('✅ Created hooks directory');
         }
 
-        // Копируем commit-msg хук из текущей директории
+        // Копируем commit-msg хук из utils/git-hooks
         try {
-            const commitMsgContent = await fs.readFile(path.join(__dirname, 'commit-msg'), 'utf8');
+            const commitMsgContent = await fs.readFile(sourceHookPath, 'utf8');
             await fs.writeFile(commitMsgPath, commitMsgContent, { mode: 0o755 });
             console.log('✅ Installed commit-msg hook');
         } catch (error) {
