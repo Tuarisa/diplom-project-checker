@@ -1,26 +1,32 @@
 const express = require('express');
-const path = require('path');
 const livereload = require('livereload');
 const connectLivereload = require('connect-livereload');
+const path = require('path');
 const { execSync } = require('child_process');
+const { watch } = require('fs');
 const fs = require('fs').promises;
 const { WORKING_DIR } = require('./paths');
 
-const app = express();
-const port = 3000;
-
-// Создаем сервер livereload с игнорированием минифицированных файлов
+// Create live-reload server watching HTML and CSS
 const liveReloadServer = livereload.createServer({
+    exts: ['html', 'css', 'scss'],
+    delay: 100,
+    port: 35729,
     exclusions: ['**/*.min.css', '**/node_modules/**']
 });
-liveReloadServer.watch(WORKING_DIR);
 
-// Добавляем debounce для предотвращения множественных вызовов
-let minificationTimeout;
-function debounceMinification(func, wait = 1000) {
-    clearTimeout(minificationTimeout);
-    minificationTimeout = setTimeout(func, wait);
-}
+// Set directories to watch
+const watchDirs = [
+    WORKING_DIR,                                    // Root directory for HTML
+    path.join(WORKING_DIR, 'assets'),              // Assets directory for compiled CSS
+    path.join(WORKING_DIR, 'styles'),              // Styles directory for SCSS
+];
+
+// Watch all directories
+liveReloadServer.watch(watchDirs);
+
+const app = express();
+const port = 3000;
 
 // Функция для минификации CSS
 async function minifyCSS() {
@@ -41,13 +47,18 @@ async function minifyCSS() {
         });
         
         console.log('✨ CSS files minified successfully!');
+        
+        // Trigger livereload for CSS files
+        liveReloadServer.refresh('*.css');
     } catch (error) {
         console.error('Error minifying CSS:', error.message);
     }
 }
 
-// Добавляем middleware для livereload
-app.use(connectLivereload());
+// Connect live-reload middleware
+app.use(connectLivereload({
+    port: 35729
+}));
 
 // Настраиваем статические пути
 app.use('/assets', express.static(path.join(WORKING_DIR, 'assets')));
@@ -65,25 +76,34 @@ app.get('/', (req, res) => {
     res.redirect('/index.html');
 });
 
-// Отслеживаем изменения в CSS файлах
-liveReloadServer.server.once("connection", () => {
-    // Минифицируем CSS при первом подключении
-    minifyCSS();
-});
-
-// Добавляем обработчик изменений для CSS файлов
-liveReloadServer.watcher.on('change', async (file) => {
-    // Игнорируем минифицированные файлы
-    if (file.endsWith('.min.css')) return;
-    
-    // Проверяем только CSS и SCSS файлы
-    if (file.endsWith('.css') || file.endsWith('.scss')) {
-        debounceMinification(minifyCSS);
+// Watch HTML files in root directory
+watch(WORKING_DIR, { recursive: false }, (eventType, filename) => {
+    if (filename && filename.endsWith('.html')) {
+        console.log('HTML file changes detected:', filename);
+        liveReloadServer.refresh(filename);
     }
 });
+
+// Watch for changes in SCSS files
+watch(path.join(WORKING_DIR, 'styles'), { recursive: true }, (eventType, filename) => {
+    if (filename && filename.endsWith('.scss')) {
+        console.log('SCSS file changes detected, recompiling...');
+        try {
+            execSync('yarn sass', { stdio: 'inherit' });
+            console.log('SCSS compiled successfully');
+            minifyCSS();
+        } catch (error) {
+            console.error('Error compiling SCSS:', error.message);
+        }
+    }
+});
+
+// Минифицируем CSS при запуске сервера
+minifyCSS();
 
 // Запускаем сервер
 app.listen(port, () => {
     console.log(`\n🚀 Server started at http://localhost:${port}`);
-    console.log(`📁 Serving files from: ${WORKING_DIR}\n`);
+    console.log(`📁 Serving files from: ${WORKING_DIR}`);
+    console.log('👀 Watching for file changes...\n');
 }); 
