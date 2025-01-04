@@ -6,13 +6,32 @@ async function setupGitHooks() {
     try {
         console.log('\n🔧 Setting up Git hooks...\n');
 
+        // Проверяем существование WORKING_DIR
+        try {
+            await fs.access(WORKING_DIR);
+        } catch {
+            console.error('❌ Working directory does not exist:', WORKING_DIR);
+            process.exit(1);
+        }
+
         // Путь к хукам в проверяемом проекте
         const gitDir = path.join(WORKING_DIR, '.git');
         const hooksDir = path.join(gitDir, 'hooks');
         const commitMsgPath = path.join(hooksDir, 'commit-msg');
 
-        // Путь к исходному хуку в текущей директории
+        // Путь к исходному хуку в директории чекера
         const sourceHookPath = path.join(__dirname, 'git-hooks', 'commit-msg');
+
+        console.log('Source hook path:', sourceHookPath);
+        console.log('Target hook path:', commitMsgPath);
+
+        // Проверяем существование исходного хука
+        try {
+            await fs.access(sourceHookPath);
+        } catch {
+            console.error('❌ Source hook file not found:', sourceHookPath);
+            process.exit(1);
+        }
 
         // Проверяем существование .git директории
         try {
@@ -26,17 +45,19 @@ async function setupGitHooks() {
         try {
             await fs.access(hooksDir);
         } catch {
-            await fs.mkdir(hooksDir);
-            console.log('✅ Created hooks directory');
+            await fs.mkdir(hooksDir, { recursive: true });
+            console.log('✅ Created hooks directory:', hooksDir);
         }
 
-        // Копируем commit-msg хук из utils/git-hooks
+        // Копируем commit-msg хук
         try {
             const commitMsgContent = await fs.readFile(sourceHookPath, 'utf8');
             await fs.writeFile(commitMsgPath, commitMsgContent, { mode: 0o755 });
-            console.log('✅ Installed commit-msg hook');
+            console.log('✅ Installed commit-msg hook to:', commitMsgPath);
         } catch (error) {
             console.error('❌ Error installing commit-msg hook:', error.message);
+            console.error('Source:', sourceHookPath);
+            console.error('Target:', commitMsgPath);
             process.exit(1);
         }
 
