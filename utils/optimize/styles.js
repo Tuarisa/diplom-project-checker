@@ -2,6 +2,14 @@ const fs = require('fs').promises;
 const path = require('path');
 const prettier = require('prettier');
 const stylelint = require('stylelint');
+const { 
+    resolveWorkingPath,
+    resolveStylesPath,
+    ensureDirectoryExists 
+} = require('../paths');
+
+// Files to ignore during optimization
+const IGNORED_FILES = ['normalize.css'];
 
 // Словарь именованных цветов и их HEX-эквивалентов
 const COLOR_NAMES = {
@@ -57,54 +65,73 @@ async function replaceNamedColors(content) {
 }
 
 async function optimizeStyles() {
-    console.log('🔍 Checking SCSS against criteria...');
-    
-    const stylesDir = path.join(__dirname, '..', '..', 'styles');
-    const scssFiles = await fs.readdir(stylesDir);
-    
-    for (const file of scssFiles) {
-        if (!file.endsWith('.scss')) continue;
+    try {
+        console.log('🔍 Checking styles against criteria...');
         
-        const filePath = path.join(stylesDir, file);
-        let content = await fs.readFile(filePath, 'utf8');
+        // Ensure styles directory exists
+        const stylesDir = resolveStylesPath();
+        await ensureDirectoryExists(stylesDir);
         
-        // Форматируем SCSS с помощью prettier
-        console.log(`\nProcessing ${file}...`);
-        content = await prettier.format(content, {
-            parser: 'scss',
-            printWidth: 80,
-            tabWidth: 4,
-            useTabs: false,
-            singleQuote: true,
-            trailingComma: 'none',
-            bracketSpacing: true,
-            semi: true,
-            // Специфичные настройки для SCSS
-            singleLinePerSelector: true, // Каждый селектор на новой строке
-            singleLinePerProperty: true, // Каждое свойство на новой строке
-            hexLowercase: true, // HEX цвета в нижнем регистре
-            hexShorthand: true // Сокращенные HEX цвета где возможно (#ffffff -> #fff)
-        });
+        // Get all style files except ignored ones
+        const files = await fs.readdir(stylesDir);
+        const styleFiles = files
+            .filter(file => !IGNORED_FILES.includes(file))
+            .filter(file => file.endsWith('.scss') || file.endsWith('.css'));
         
-        // Заменяем именованные цвета на HEX
-        content = await replaceNamedColors(content);
-        await fs.writeFile(filePath, content);
-        console.log(`✅ Formatted ${file}`);
-        
-        // Проверяем оставшиеся проблемы через stylelint
-        const lintResult = await stylelint.lint({
-            files: filePath,
-            fix: false, // Отключаем автоисправление, так как форматирование делает prettier
-            formatter: 'string'
-        });
-        
-        if (lintResult.errored) {
-            console.log('\n⚠️  Remaining SCSS issues that need manual fixes:');
-            console.log(lintResult.output);
-            console.log('\nPlease fix these issues manually according to the criteria.');
-        } else {
-            console.log('✅ SCSS meets all criteria!');
+        if (styleFiles.length === 0) {
+            console.log('⚠️ No style files found to optimize');
+            return;
         }
+        
+        for (const file of styleFiles) {
+            try {
+                console.log(`\nProcessing ${file}...`);
+                const filePath = path.join(stylesDir, file);
+                let content = await fs.readFile(filePath, 'utf8');
+                
+                // Format with prettier
+                content = await prettier.format(content, {
+                    parser: file.endsWith('.scss') ? 'scss' : 'css',
+                    printWidth: 80,
+                    tabWidth: 4,
+                    useTabs: false,
+                    singleQuote: true,
+                    trailingComma: 'none',
+                    bracketSpacing: true,
+                    semi: true,
+                    singleLinePerSelector: true,
+                    singleLinePerProperty: true,
+                    hexLowercase: true,
+                    hexShorthand: true
+                });
+                
+                // Replace named colors with HEX
+                content = await replaceNamedColors(content);
+                
+                // Save formatted content
+                await fs.writeFile(filePath, content);
+                console.log(`✅ Formatted ${file}`);
+                
+                // Run stylelint
+                const lintResult = await stylelint.lint({
+                    files: filePath,
+                    fix: false,
+                    formatter: 'string'
+                });
+                
+                if (lintResult.errored) {
+                    console.log('\n⚠️  Style issues that need manual fixes:');
+                    console.log(lintResult.output);
+                    console.log('\nPlease fix these issues manually according to the criteria.');
+                } else {
+                    console.log('✅ Styles meet all criteria!');
+                }
+            } catch (error) {
+                console.error(`❌ Error processing ${file}:`, error.message);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error optimizing styles:', error.message);
     }
 }
 

@@ -2,26 +2,22 @@ const fs = require('fs').promises;
 const path = require('path');
 const sharp = require('sharp');
 const SVGSpriter = require('svg-sprite');
-
-async function ensureDir(dir) {
-    try {
-        await fs.access(dir);
-    } catch {
-        await fs.mkdir(dir, { recursive: true });
-    }
-}
+const { 
+    resolveWorkingPath,
+    resolveImagesPath,
+    resolveAssetsPath,
+    ensureDirectoryExists 
+} = require('../paths');
 
 async function optimizeImages() {
     try {
         console.log('🔄 Optimizing images...');
-        const imagesDir = path.join(__dirname, '..', '..', 'images');
-        const assetsDir = path.join(__dirname, '..', '..', 'assets');
-        const outputDir = path.join(assetsDir, 'images', 'content');
+        const imagesDir = resolveImagesPath();
+        const outputDir = path.join(resolveAssetsPath(), 'images', 'content');
         
         // Create necessary directories
-        await ensureDir(imagesDir);
-        await ensureDir(assetsDir);
-        await ensureDir(outputDir);
+        await ensureDirectoryExists(imagesDir);
+        await ensureDirectoryExists(outputDir);
 
         // Recursive reading of all files in the images directory
         async function readDirRecursive(dir) {
@@ -72,11 +68,11 @@ async function optimizeImages() {
 async function createSvgSprite() {
     try {
         console.log('🔄 Creating SVG sprite...');
-        const iconsDir = path.join(__dirname, '..', '..', 'images', 'icons');
-        const assetsDir = path.join(__dirname, '..', '..', 'assets', 'images', 'icons');
+        const iconsDir = path.join(resolveImagesPath(), 'icons');
+        const assetsDir = path.join(resolveAssetsPath(), 'images', 'icons');
         
         // Create output directory
-        await ensureDir(assetsDir);
+        await ensureDirectoryExists(assetsDir);
         
         // Configure spriter
         const spriter = new SVGSpriter({
