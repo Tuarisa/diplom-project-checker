@@ -5,6 +5,7 @@ const stylelint = require('stylelint');
 const { 
     resolveWorkingPath,
     resolveStylesPath,
+    resolveAssetsPath,
     ensureDirectoryExists 
 } = require('../paths');
 
@@ -64,6 +65,41 @@ async function replaceNamedColors(content) {
     return updatedContent;
 }
 
+async function replaceSvgUrls(content) {
+    let updatedContent = content;
+    
+    // Ищем использование SVG в url()
+    const svgPattern = /url\(['"]?([^'")\s]+\.svg)['"]?\)/gi;
+    let match;
+    let replacements = [];
+
+    while ((match = svgPattern.exec(content)) !== null) {
+        const [fullMatch, svgPath] = match;
+        
+        // Проверяем, является ли это иконкой
+        if (svgPath.includes('icons/') || svgPath.includes('icons\\')) {
+            const iconName = path.basename(svgPath, '.svg');
+            replacements.push({
+                original: fullMatch,
+                replacement: `url("../images/icons/sprite.svg#icon-${iconName}")`,
+                position: match.index
+            });
+        }
+    }
+
+    // Сортируем замены от конца к началу
+    replacements.sort((a, b) => b.position - a.position);
+
+    // Применяем замены
+    for (const replacement of replacements) {
+        const before = updatedContent.slice(0, replacement.position);
+        const after = updatedContent.slice(replacement.position + replacement.original.length);
+        updatedContent = before + replacement.replacement + after;
+    }
+
+    return updatedContent;
+}
+
 async function optimizeStyles() {
     try {
         console.log('🔍 Checking styles against criteria...');
@@ -107,6 +143,9 @@ async function optimizeStyles() {
                 
                 // Replace named colors with HEX
                 content = await replaceNamedColors(content);
+                
+                // Replace SVG urls with sprite references
+                content = await replaceSvgUrls(content);
                 
                 // Save formatted content
                 await fs.writeFile(filePath, content);
