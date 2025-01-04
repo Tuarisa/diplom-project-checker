@@ -93,8 +93,18 @@ async function optimizeHtml(content) {
         printWidth: 120,
         htmlWhitespaceSensitivity: 'css',
         bracketSameLine: true,
-        singleAttributePerLine: false,
-        bracketSpacing: false
+        singleAttributePerLine: false
+    });
+
+    // Форматируем ссылки в head в одну строку
+    const headPattern = /(<head[^>]*>)([\s\S]*?)(<\/head>)/i;
+    optimizedContent = optimizedContent.replace(headPattern, (match, startTag, content, endTag) => {
+        // Обрабатываем только link и meta теги
+        content = content.replace(/<(link|meta)[^>]+>/g, (tag) => {
+            // Убираем переносы строк и лишние пробелы
+            return tag.replace(/\s+/g, ' ').trim() + '\n';
+        });
+        return startTag + '\n' + content + endTag;
     });
     
     // Replace style paths with minified versions from assets
