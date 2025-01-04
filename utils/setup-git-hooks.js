@@ -37,17 +37,39 @@ function setupGitHooks() {
 
         // Создаем директорию hooks и все промежуточные директории
         try {
-            fs.mkdirSync(hooksDir, { recursive: true });
-            console.log('✅ Hooks directory ready:', hooksDir);
+            if (!fs.existsSync(hooksDir)) {
+                fs.mkdirSync(hooksDir, { recursive: true });
+                console.log('✅ Created hooks directory:', hooksDir);
+            } else {
+                console.log('✅ Hooks directory exists:', hooksDir);
+            }
         } catch (error) {
-            console.error('❌ Error creating hooks directory:', error.message);
+            console.error('❌ Error with hooks directory:', error.message);
             process.exit(1);
+        }
+
+        // Удаляем существующий хук, если он есть
+        if (fs.existsSync(commitMsgPath)) {
+            try {
+                fs.unlinkSync(commitMsgPath);
+                console.log('✅ Removed existing hook');
+            } catch (error) {
+                console.error('❌ Error removing existing hook:', error.message);
+                process.exit(1);
+            }
         }
 
         // Копируем commit-msg хук
         try {
             const commitMsgContent = fs.readFileSync(sourceHookPath, 'utf8');
-            fs.writeFileSync(commitMsgPath, commitMsgContent, { mode: 0o755 });
+            fs.writeFileSync(commitMsgPath, commitMsgContent, { mode: 0o755, flag: 'w' });
+            
+            // Проверяем, что файл создался и имеет правильные права
+            const stats = fs.statSync(commitMsgPath);
+            if ((stats.mode & 0o777) !== 0o755) {
+                fs.chmodSync(commitMsgPath, 0o755);
+            }
+            
             console.log('✅ Installed commit-msg hook to:', commitMsgPath);
         } catch (error) {
             console.error('❌ Error installing commit-msg hook:', error.message);
