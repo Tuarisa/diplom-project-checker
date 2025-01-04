@@ -28,6 +28,13 @@ liveReloadServer.watch(watchDirs);
 const app = express();
 const port = 3000;
 
+// Setup view engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'tree/templates'));
+
+// Import tree module
+const treeRouter = require('./tree');
+
 // Функция для компиляции SCSS
 async function compileSass() {
     try {
@@ -76,6 +83,9 @@ async function minifyCSS() {
 app.use(connectLivereload({
     port: 35729
 }));
+
+// Mount tree module
+app.use('/tree', treeRouter);
 
 // Настраиваем статические пути
 app.use('/assets', express.static(path.join(WORKING_DIR, 'assets')));

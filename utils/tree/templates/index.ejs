@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Tree</title>
+    <link rel="stylesheet" href="/tree/styles.css">
+    <style>
+        .files-list {
+            display: grid;
+            gap: 0.5rem;
+        }
+        .file-item {
+            padding: 0.5rem;
+            background: #FFF;
+            border-radius: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        }
+        .file-item a {
+            color: #00E;
+            text-decoration: none;
+            display: block;
+        }
+        .file-item a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <h1 class="page-title">HTML Tree</h1>
+        <div class="lang-switcher">
+            <a href="#" class="active">RU</a>
+            <a href="#">EN</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="block">
+            <h2 class="block-title">HTML файлы проекта:</h2>
+            <div class="files-list">
+                <% files.forEach(function(file) { %>
+                    <div class="file-item">
+                        <a href="/tree/view/<%= file.path %>"><%= file.path %></a>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </main>
+</body>
+</html> 

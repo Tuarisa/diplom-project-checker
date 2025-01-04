@@ -1,4 +1,5 @@
 const path = require('path');
+const glob = require('glob');
 require('dotenv').config();
 
 // Базовые пути
@@ -33,6 +34,15 @@ function getSpritePath() {
     return resolveWorkingPath(SPRITE_PATH);
 }
 
+// Функция для получения файлов проекта по паттерну
+function getProjectFiles(pattern) {
+    return glob.sync(pattern, {
+        cwd: WORKING_DIR,
+        nodir: true,
+        ignore: ['**/node_modules/**', '**/.*/**']
+    });
+}
+
 // Функция для проверки существования директории
 async function ensureDirectoryExists(dirPath) {
     const fs = require('fs').promises;
@@ -55,5 +65,6 @@ module.exports = {
     resolveImagesPath,
     getRelativePath,
     getSpritePath,
+    getProjectFiles,
     ensureDirectoryExists
 }; 
