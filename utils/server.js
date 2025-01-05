@@ -5,7 +5,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { watch } = require('fs');
 const fs = require('fs').promises;
-const { WORKING_DIR } = require('./paths');
+const { WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR } = require('./paths');
+
+console.log(WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR);
 
 // Create live-reload server watching HTML and CSS
 const liveReloadServer = livereload.createServer({
@@ -18,8 +20,8 @@ const liveReloadServer = livereload.createServer({
 // Set directories to watch
 const watchDirs = [
     WORKING_DIR,                                    // Root directory for HTML
-    path.join(WORKING_DIR, 'assets'),              // Assets directory for compiled CSS
-    path.join(WORKING_DIR, 'styles'),              // Styles directory for SCSS
+    path.join(WORKING_DIR, ASSETS_DIR),              // Assets directory for compiled CSS
+    path.join(WORKING_DIR, STYLES_DIR),              // Styles directory for SCSS
 ];
 
 // Watch all directories
@@ -38,7 +40,7 @@ const treeRouter = require('./tree');
 // Функция для компиляции SCSS
 async function compileSass() {
     try {
-        const assetsStylesDir = path.join(WORKING_DIR, 'assets', 'styles');
+        const assetsStylesDir = path.join(WORKING_DIR, 'assets', STYLES_DIR);
         await fs.mkdir(assetsStylesDir, { recursive: true });
         
         // Компилируем SCSS в CSS
@@ -88,9 +90,9 @@ app.use(connectLivereload({
 app.use('/tree', treeRouter);
 
 // Настраиваем статические пути
-app.use('/assets', express.static(path.join(WORKING_DIR, 'assets')));
-app.use('/images', express.static(path.join(WORKING_DIR, 'images')));
-app.use('/styles', express.static(path.join(WORKING_DIR, 'styles')));
+app.use('/'+ASSETS_DIR, express.static(path.join(WORKING_DIR, ASSETS_DIR)));
+app.use('/'+IMAGES_DIR, express.static(path.join(WORKING_DIR, IMAGES_DIR)));
+app.use('/'+STYLES_DIR, express.static(path.join(WORKING_DIR, STYLES_DIR)));
 
 // Обработка favicon.ico
 app.get('/favicon.ico', (req, res) => {
@@ -117,7 +119,7 @@ watch(WORKING_DIR, { recursive: false }, (eventType, filename) => {
 });
 
 // Watch for changes in SCSS files
-watch(path.join(WORKING_DIR, 'styles'), { recursive: true }, async (eventType, filename) => {
+watch(path.join(WORKING_DIR, STYLES_DIR), { recursive: true }, async (eventType, filename) => {
     if (filename && filename.endsWith('.scss')) {
         console.log('SCSS file changes detected, recompiling...');
         const compiled = await compileSass();

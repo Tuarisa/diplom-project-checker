@@ -79,11 +79,11 @@ async function replaceSvgUrls(content) {
         // Проверяем, является ли это иконкой
         if (svgPath.includes('icons/') || svgPath.includes('icons\\')) {
             const iconName = path.basename(svgPath, '.svg');
-            replacements.push({
-                original: fullMatch,
-                replacement: `url("../images/icons/sprite.svg#icon-${iconName}")`,
-                position: match.index
-            });
+            // replacements.push({
+            //     original: fullMatch,
+            //     replacement: `url("../images/icons/sprite.svg#icon-${iconName}")`,
+            //     position: match.index
+            // });
         }
     }
 
