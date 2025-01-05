@@ -19,20 +19,14 @@ async function runValidation() {
             validateStructure()
         ]);
 
-        // Combine all errors
-        const allErrors = [
-            ...htmlErrors,
-            ...w3cErrors,
-            ...bemErrors,
-            ...stylesErrors,
-            ...imagesErrors,
-            ...structureErrors
-        ];
+        const hasErrors = htmlErrors.length > 0 || 
+                         w3cErrors.length > 0 || 
+                         bemErrors.length > 0 || 
+                         stylesErrors.length > 0 || 
+                         imagesErrors.length > 0 || 
+                         structureErrors.length > 0;
 
-        if (allErrors.length > 0) {
-            console.log('❌ Validation failed with the following errors:\n');
-            console.log(allErrors.join('\n'));
-
+        if (hasErrors) {
             // Add summary report
             console.log('\n📊 Validation Summary:');
             console.log('─'.repeat(50));
@@ -53,7 +47,8 @@ async function runValidation() {
             }
 
             console.log('─'.repeat(50));
-            console.log(`Total Errors: ${allErrors.length}`);
+            console.log(`Total Errors: ${htmlErrors.length + w3cErrors.length + bemErrors.length + 
+                stylesErrors.length + imagesErrors.length + structureErrors.length}`);
             
             process.exit(1);
         } else {
