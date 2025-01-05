@@ -92,6 +92,11 @@ app.use('/assets', express.static(path.join(WORKING_DIR, 'assets')));
 app.use('/images', express.static(path.join(WORKING_DIR, 'images')));
 app.use('/styles', express.static(path.join(WORKING_DIR, 'styles')));
 
+// Обработка favicon.ico
+app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(WORKING_DIR, 'favicon.ico'));
+});
+
 // Обрабатываем все HTML файлы в корневой директории
 app.get('/:page?.html', (req, res) => {
     const page = req.params.page || 'index';
