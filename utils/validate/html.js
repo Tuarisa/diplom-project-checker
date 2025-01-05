@@ -3,14 +3,61 @@ const { JSDOM } = require('jsdom');
 const { WORKING_DIR, resolveWorkingPath } = require('../paths');
 const { logValidationErrors } = require('../validation-logger');
 
+// Helper function to get normalized HTML structure (excluding href attributes)
+function getNormalizedStructure(element) {
+    if (!element) return '';
+    const clone = element.cloneNode(true);
+    const links = clone.getElementsByTagName('a');
+    for (const link of links) {
+        link.removeAttribute('href');
+    }
+    return clone.innerHTML.replace(/\s+/g, ' ').trim();
+}
+
+// Helper function to find first difference in HTML structures
+function findFirstDifference(str1, str2) {
+    const lines1 = str1.split('\n');
+    const lines2 = str2.split('\n');
+    
+    for (let i = 0; i < Math.min(lines1.length, lines2.length); i++) {
+        if (lines1[i].trim() !== lines2[i].trim()) {
+            return `Difference found:\nCurrent: ${lines1[i].trim()}\nExpected: ${lines2[i].trim()}`;
+        }
+    }
+    if (lines1.length !== lines2.length) {
+        return `Different number of lines. Current: ${lines1.length}, Expected: ${lines2.length}`;
+    }
+    return lines1[0].trim(); // Return first line if no visible difference found
+}
+
 async function validateHTML() {
     try {
         const allErrors = [];
         const titles = new Map();
         const descriptions = new Map();
+        
+        // Store reference structures from index.html
+        let referenceHeader = null;
+        let referenceFooter = null;
+        let indexContent = null;
+        let indexDoc = null;
 
         const files = await fs.readdir(WORKING_DIR);
         const htmlFiles = files.filter(file => file.endsWith('.html'));
+
+        // First, get reference structures from index.html
+        if (htmlFiles.includes('index.html')) {
+            const indexPath = resolveWorkingPath('index.html');
+            indexContent = await fs.readFile(indexPath, 'utf8');
+            const indexDom = new JSDOM(indexContent);
+            indexDoc = indexDom.window.document;
+            
+            const indexHeader = indexDoc.querySelector('header');
+            const indexFooter = indexDoc.querySelector('footer');
+            
+            if (indexHeader) referenceHeader = getNormalizedStructure(indexHeader);
+            if (indexFooter) referenceFooter = getNormalizedStructure(indexFooter);
+        }
 
         for (const file of htmlFiles) {
             const fileErrors = [];
@@ -18,6 +65,52 @@ async function validateHTML() {
             const content = await fs.readFile(filePath, 'utf8');
             const dom = new JSDOM(content);
             const document = dom.window.document;
+
+            // Skip header/footer checks for index.html itself
+            if (file !== 'index.html' && indexDoc) {
+                const header = document.querySelector('header');
+                const footer = document.querySelector('footer');
+
+                // Compare header structure
+                if (header && referenceHeader) {
+                    const currentHeader = getNormalizedStructure(header);
+                    if (currentHeader !== referenceHeader) {
+                        const firstDiff = findFirstDifference(header.outerHTML, indexDoc.querySelector('header').outerHTML);
+                        fileErrors.push({
+                            filePath,
+                            line: content.split('\n').findIndex(line => line.includes('<header')) + 1,
+                            message: 'Header structure differs from index.html',
+                            context: firstDiff
+                        });
+                    }
+                } else if (!header && referenceHeader) {
+                    fileErrors.push({
+                        filePath,
+                        line: 1,
+                        message: 'Missing header element (present in index.html)'
+                    });
+                }
+
+                // Compare footer structure
+                if (footer && referenceFooter) {
+                    const currentFooter = getNormalizedStructure(footer);
+                    if (currentFooter !== referenceFooter) {
+                        const firstDiff = findFirstDifference(footer.outerHTML, indexDoc.querySelector('footer').outerHTML);
+                        fileErrors.push({
+                            filePath,
+                            line: content.split('\n').findIndex(line => line.includes('<footer')) + 1,
+                            message: 'Footer structure differs from index.html',
+                            context: firstDiff
+                        });
+                    }
+                } else if (!footer && referenceFooter) {
+                    fileErrors.push({
+                        filePath,
+                        line: 1,
+                        message: 'Missing footer element (present in index.html)'
+                    });
+                }
+            }
 
             // Check DOCTYPE
             if (!content.trim().toLowerCase().startsWith('<!doctype html>')) {
@@ -273,4 +366,5 @@ async function validateHTML() {
     }
 }
 
+module.exports = validateHTML; 
 module.exports = validateHTML; 
