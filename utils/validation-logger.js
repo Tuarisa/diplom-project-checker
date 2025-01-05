@@ -1,5 +1,3 @@
-const chalk = require('chalk');
-
 /**
  * Format validation errors output in a consistent way
  * @param {string} fileName - Name of the file being validated
@@ -9,7 +7,7 @@ const chalk = require('chalk');
  */
 function logValidationErrors(fileName, validationType, errors) {
     if (!errors || errors.length === 0) {
-        console.log(`\n${chalk.green('✓')} ${fileName} passed ${validationType} validation\n`);
+        console.log(`\n✓ ${fileName} passed ${validationType} validation\n`);
         return true;
     }
 
@@ -22,7 +20,7 @@ function logValidationErrors(fileName, validationType, errors) {
         const filePath = error.filePath || fileName;
         const lineInfo = error.line ? `:${error.line}` : '';
         
-        console.log(`   ${errorNumber} ${chalk.red('⭕')} ${filePath}${lineInfo}`);
+        console.log(`   ${errorNumber} ⭕ ${filePath}${lineInfo}`);
         console.log(`      • ${error.message}`);
         
         if (error.context) {

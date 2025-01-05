@@ -1,4 +1,5 @@
 const validateHTML = require('./html');
+const validateW3C = require('./w3c');
 const validateBEM = require('./bem');
 const validateStyles = require('./styles');
 const validateImages = require('./images');
@@ -9,8 +10,9 @@ async function runValidation() {
 
     try {
         // Run all validators
-        const [htmlErrors, bemErrors, stylesErrors, imagesErrors, structureErrors] = await Promise.all([
+        const [htmlErrors, w3cErrors, bemErrors, stylesErrors, imagesErrors, structureErrors] = await Promise.all([
             validateHTML(),
+            validateW3C(),
             validateBEM(),
             validateStyles(),
             validateImages(),
@@ -20,6 +22,7 @@ async function runValidation() {
         // Combine all errors
         const allErrors = [
             ...htmlErrors,
+            ...w3cErrors,
             ...bemErrors,
             ...stylesErrors,
             ...imagesErrors,
@@ -36,6 +39,7 @@ async function runValidation() {
             
             const errorsByType = {
                 'HTML Errors': htmlErrors.length,
+                'W3C Errors': w3cErrors.length,
                 'BEM Naming Errors': bemErrors.length,
                 'Style Errors': stylesErrors.length,
                 'Image Errors': imagesErrors.length,

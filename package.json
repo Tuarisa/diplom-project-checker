@@ -6,7 +6,8 @@
   "scripts": {
     "sync": "node utils/sync.js",
     "validate": "node utils/validate/index.js",
-    "validate:html": "node -e \"require('./utils/validate/html')().then(errors => { console.log(errors.join('\\n')); process.exit(errors.length > 0 ? 1 : 0); })\"",
+    "validate:html": "node -e \"require('./utils/validate/html')().then(result => process.exit(result ? 0 : 1));\"",
+    "validate:w3c": "node -e \"require('./utils/validate/w3c')().then(result => process.exit(result ? 0 : 1));\"",
     "validate:bem": "node -e \"require('./utils/validate/bem')().then(errors => { console.log(errors.join('\\n')); process.exit(errors.length > 0 ? 1 : 0); })\"",
     "validate:styles": "node -e \"require('./utils/validate/styles')().then(errors => { console.log(errors.join('\\n')); process.exit(errors.length > 0 ? 1 : 0); })\"",
     "validate:images": "node -e \"require('./utils/validate/images')().then(errors => { console.log(errors.join('\\n')); process.exit(errors.length > 0 ? 1 : 0); })\"",
