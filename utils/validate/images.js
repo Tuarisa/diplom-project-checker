@@ -55,11 +55,20 @@ async function validateImages() {
                     });
                 }
 
-                // Check if image file exists
+                // Check if image file exists and has correct format
                 if (src) {
                     const imgPath = resolveImagesPath(src.replace(/^images\//, ''));
                     try {
                         await fs.access(imgPath);
+                        // Проверяем расширение файла
+                        if (!src.toLowerCase().endsWith('.webp')) {
+                            allErrors.push({
+                                filePath,
+                                line: lineNumber,
+                                message: 'Image must be in WebP format',
+                                context: img.outerHTML
+                            });
+                        }
                     } catch {
                         allErrors.push({
                             filePath,
