@@ -6,6 +6,226 @@ const autoprefixer = require('autoprefixer');
 const { WORKING_DIR, STYLES_DIR, resolveWorkingPath, resolveStylesPath } = require('../paths');
 const { logValidationErrors } = require('../validation-logger');
 
+// Функция для проверки интерактивных элементов
+function checkInteractiveElements(content, filePath, fileErrors) {
+    const lines = content.split('\n');
+    const interactiveSelectors = new Set();
+    let currentSelector = null;
+    let hasHover = false;
+    let hasActive = false;
+    let hasFocus = false;
+    
+    // Регулярки для поиска только BEM блоков и элементов
+    const bemPattern = /^\.([a-z0-9]+-[a-z0-9]+(?:__[a-z0-9]+-[a-z0-9]+)?)/;
+    
+    // Паттерны для интерактивных элементов в BEM
+    const interactiveNames = /(btn|button|link)/i;
+    
+    // Свойства, которые могут нарушать поток документа
+    const flowBreakingProps = [
+        'width',
+        'height',
+        'margin',
+        'padding',
+        'position',
+        'display',
+        'top',
+        'left',
+        'right',
+        'bottom'
+    ];
+
+    lines.forEach((line, index) => {
+        const lineNumber = index + 1;
+        const trimmedLine = line.trim();
+
+        // Пропускаем комментарии
+        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+            return;
+        }
+
+        // Ищем селектор
+        if (trimmedLine.includes('{')) {
+            currentSelector = null; // Сбрасываем селектор по умолчанию
+            
+            // Проверяем, что это BEM селектор
+            const bemMatch = trimmedLine.match(bemPattern);
+            if (bemMatch) {
+                const selector = bemMatch[1];
+                
+                // Проверяем, что это не модификатор и содержит интерактивное имя
+                if (!selector.includes('--') && interactiveNames.test(selector)) {
+                    currentSelector = selector;
+                    interactiveSelectors.add(selector);
+                    hasHover = false;
+                    hasActive = false;
+                    hasFocus = false;
+                }
+            }
+        }
+        
+        // Проверяем состояния только для валидных BEM селекторов
+        if (currentSelector) {
+            if (line.includes(':hover')) hasHover = true;
+            if (line.includes(':active')) hasActive = true;
+            if (line.includes(':focus')) hasFocus = true;
+
+            // Проверяем свойства в состояниях
+            if ((line.includes(':hover') || line.includes(':focus')) && 
+                flowBreakingProps.some(prop => line.includes(prop))) {
+                fileErrors.push({
+                    filePath,
+                    line: lineNumber,
+                    message: `Interactive element state changes document flow: ${currentSelector}`,
+                    context: line.trim(),
+                    suggestion: 'Use transform or opacity for hover/focus states instead'
+                });
+            }
+        }
+
+        // Если блок закрывается, проверяем наличие всех состояний
+        if (trimmedLine === '}' && currentSelector) {
+            if (!hasHover || !hasActive || !hasFocus) {
+                const missingStates = [];
+                if (!hasHover) missingStates.push(':hover');
+                if (!hasActive) missingStates.push(':active');
+                if (!hasFocus) missingStates.push(':focus');
+
+                fileErrors.push({
+                    filePath,
+                    line: lineNumber,
+                    message: `Interactive element ${currentSelector} missing states: ${missingStates.join(', ')}`,
+                    context: `Selector: ${currentSelector}`,
+                    suggestion: 'Add missing states to improve accessibility and user experience'
+                });
+            }
+            currentSelector = null;
+        }
+    });
+}
+
+// Функция для проверки фона
+function checkBackgroundProperties(content, filePath, fileErrors) {
+    const lines = content.split('\n');
+    let hasBackgroundImage = false;
+    let hasBackgroundColor = false;
+    let backgroundImageLine = 0;
+    let currentSelector = '';
+    let inBlock = false;
+
+    lines.forEach((line, index) => {
+        const lineNumber = index + 1;
+        const trimmedLine = line.trim();
+
+        // Пропускаем комментарии
+        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+            return;
+        }
+
+        // Находим начало блока
+        if (trimmedLine.includes('{')) {
+            currentSelector = trimmedLine.replace('{', '').trim();
+            inBlock = true;
+            hasBackgroundImage = false;
+            hasBackgroundColor = false;
+        }
+
+        // Проверяем свойства внутри блока
+        if (inBlock) {
+            if (trimmedLine.includes('background-image') || 
+                (trimmedLine.includes('background:') && trimmedLine.includes('url('))) {
+                hasBackgroundImage = true;
+                backgroundImageLine = lineNumber;
+            }
+            if (trimmedLine.includes('background-color') || 
+                (trimmedLine.includes('background:') && /:#?[0-9a-f]{3,8}|rgba?\(|hsla?\(/.test(trimmedLine))) {
+                hasBackgroundColor = true;
+            }
+        }
+
+        // Конец блока - проверяем результаты
+        if (trimmedLine === '}') {
+            if (hasBackgroundImage && !hasBackgroundColor) {
+                fileErrors.push({
+                    filePath,
+                    line: backgroundImageLine,
+                    message: `Missing background-color for element with background-image`,
+                    context: `Selector: ${currentSelector}`,
+                    suggestion: 'Add background-color to ensure text readability when image fails to load'
+                });
+            }
+            inBlock = false;
+        }
+    });
+}
+
+// Функция для проверки закомментированного кода
+function checkCommentedCode(content, filePath, fileErrors) {
+    const lines = content.split('\n');
+    let inCommentBlock = false;
+    let commentBlockStart = 0;
+    let commentedCode = [];
+
+    // Паттерны для определения кода в комментариях
+    const codePatterns = [
+        /[{};]/,                    // CSS синтаксис
+        /^[.#][a-zA-Z]/,           // Селекторы
+        /^[a-z-]+:/,               // CSS свойства
+        /@media|@keyframes|@import/ // CSS директивы
+    ];
+
+    lines.forEach((line, index) => {
+        const lineNumber = index + 1;
+        const trimmedLine = line.trim();
+
+        // Начало блочного комментария
+        if (trimmedLine.startsWith('/*')) {
+            inCommentBlock = true;
+            commentBlockStart = lineNumber;
+            commentedCode = [];
+        }
+
+        // Проверяем содержимое комментария
+        if (inCommentBlock || trimmedLine.startsWith('//')) {
+            const uncommentedLine = trimmedLine
+                .replace(/^\/\*/, '')
+                .replace(/\*\/$/, '')
+                .replace(/^\/\//, '')
+                .trim();
+
+            if (codePatterns.some(pattern => pattern.test(uncommentedLine))) {
+                commentedCode.push(uncommentedLine);
+            }
+        }
+
+        // Конец блочного комментария
+        if (trimmedLine.endsWith('*/')) {
+            inCommentBlock = false;
+            if (commentedCode.length > 0) {
+                fileErrors.push({
+                    filePath,
+                    line: commentBlockStart,
+                    message: 'Found commented code block',
+                    context: commentedCode.join('\n'),
+                    suggestion: 'Remove commented code to keep the codebase clean. Use version control for code history'
+                });
+            }
+        }
+
+        // Однострочный комментарий с кодом
+        if (trimmedLine.startsWith('//') && commentedCode.length > 0) {
+            fileErrors.push({
+                filePath,
+                line: lineNumber,
+                message: 'Found commented code',
+                context: trimmedLine,
+                suggestion: 'Remove commented code to keep the codebase clean. Use version control for code history'
+            });
+            commentedCode = [];
+        }
+    });
+}
+
 async function validateStyles() {
     try {
         const files = await fs.readdir(resolveStylesPath());
@@ -15,8 +235,6 @@ async function validateStyles() {
         );
         const allErrors = [];
         const fileErrorsMap = new Map();
-
-        // Объект для хранения информации о цветах
         const colorUsage = new Map();
 
         for (const file of styleFiles) {
@@ -29,7 +247,7 @@ async function validateStyles() {
             }
             const fileErrors = fileErrorsMap.get(fullPath);
 
-            // Stylelint validation using local config
+            // Stylelint validation
             const stylelintResult = await stylelint.lint({
                 code: content,
                 fix: false,
@@ -47,7 +265,7 @@ async function validateStyles() {
                 });
             }
 
-            // Check for vendor prefixes
+            // Проверка вендорных префиксов
             try {
                 const result = await postcss([autoprefixer]).process(content, {
                     from: undefined
@@ -70,19 +288,17 @@ async function validateStyles() {
                 });
             }
 
-            // Check for consistent units
+            // Проверка единиц измерения
             const lines = content.split('\n');
             let currentUnitType = null;
 
             lines.forEach((line, index) => {
                 const lineNumber = index + 1;
 
-                // Проверка на дублирование цветов
                 const colorMatches = line.match(/:\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))/g);
                 if (colorMatches) {
                     colorMatches.forEach(match => {
                         const color = match.replace(/^:\s*/, '').toLowerCase();
-                        // Игнорируем строки с переменными
                         if (!line.includes('var(') && !line.includes('$')) {
                             if (!colorUsage.has(color)) {
                                 colorUsage.set(color, [{
@@ -119,7 +335,7 @@ async function validateStyles() {
                     }
                 }
 
-                if (marginMatch && marginMatch[1] !== currentUnitType) {
+                if (marginMatch && marginMatch[1] !== currentUnitType && currentUnitType !== null) {
                     fileErrors.push({
                         filePath: fullPath,
                         line: lineNumber,
@@ -137,9 +353,14 @@ async function validateStyles() {
                     });
                 }
             });
+
+            // Новые проверки
+            checkInteractiveElements(content, fullPath, fileErrors);
+            checkBackgroundProperties(content, fullPath, fileErrors);
+            checkCommentedCode(content, fullPath, fileErrors);
         }
 
-        // Проверяем дублирующиеся цвета
+        // Проверка дублирования цветов
         for (const [color, usages] of colorUsage) {
             if (usages.length > 1) {
                 const firstUsage = usages[0];
@@ -156,7 +377,7 @@ async function validateStyles() {
             }
         }
 
-        // Логируем все ошибки для каждого файла
+        // Логируем все ошибки
         for (const [filePath, fileErrors] of fileErrorsMap) {
             if (fileErrors.length > 0) {
                 logValidationErrors(filePath, 'Styles', fileErrors);
