@@ -10,6 +10,8 @@
 
 ### Валидация
 - [HTML валидация](docs/validate/html.md)
+  - [W3C валидация](docs/validate/w3c.md)
+  - [BEM валидация](docs/validate/bem.md)
 - [CSS/SCSS валидация](docs/validate/styles.md)
 - [Валидация изображений](docs/validate/images.md)
 - [Валидация структуры проекта](docs/validate/structure.md)
@@ -32,6 +34,27 @@ yarn install
 ### Полная проверка проекта
 ```bash
 yarn validate
+```
+
+### Частичная валидация
+```bash
+# HTML валидация
+yarn validate:html
+
+# W3C валидация
+yarn validate:w3c
+
+# BEM валидация
+yarn validate:bem
+
+# Валидация стилей
+yarn validate:styles
+
+# Валидация изображений
+yarn validate:images
+
+# Валидация структуры
+yarn validate:structure
 ```
 
 ### Запуск сервера разработки
@@ -60,12 +83,16 @@ yarn setup
 
 ## Особенности
 - Автоматическая валидация при коммите
+- Интеграция с W3C валидатором
+- Проверка BEM методологии
 - Оптимизация изображений и создание WebP
 - Минификация CSS и HTML
 - Создание SVG-спрайтов
 - Проверка доступности
 - Линтинг кода
 - Форматирование кода
+- Единый формат логирования ошибок
+- Кэширование результатов валидации
 
 ## Требования
 - Node.js >= 14
