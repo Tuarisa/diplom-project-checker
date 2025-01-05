@@ -23,11 +23,43 @@ async function optimizeHtml(content) {
     const dom = new JSDOM(content);
     const document = dom.window.document;
 
+    // Оптимизация путей для GitHub Pages
+    // Заменяем /assets/ на assets/ для SVG спрайтов
+    const svgElements = document.querySelectorAll('use[href^="/assets/"]');
+    for (const svg of svgElements) {
+        const href = svg.getAttribute('href');
+        svg.setAttribute('href', href.replace(/^\/assets\//, 'assets/'));
+    }
+
+    // Обработка изображений в формате jpg, png
+    const imgElements = document.querySelectorAll('img[src]');
+    let imagesOptimized = 0;
+
+    for (const img of imgElements) {
+        const src = img.getAttribute('src');
+        
+        // Проверяем, является ли изображение jpg или png из папки images/content
+        if (src.match(/^(?:\/)?images\/content\/.*\.(jpg|jpeg|png)$/i)) {
+            // Создаем новый путь для WebP
+            const newPath = src
+                .replace(/^\//, '') // Убираем начальный слеш если есть
+                .replace(/^images\/content\//, 'assets/images/content/')
+                .replace(/\.(jpg|jpeg|png)$/i, '.webp');
+            
+            img.setAttribute('src', newPath);
+            imagesOptimized++;
+        }
+    }
+
+    if (imagesOptimized > 0) {
+        console.log(`✓ Updated ${imagesOptimized} image paths to WebP format`);
+    }
+
     // Оптимизация SVG - замена на спрайты
-    const svgElements = document.querySelectorAll('img[src$=".svg"]');
+    const svgImgElements = document.querySelectorAll('img[src$=".svg"]');
     let svgOptimized = 0;
 
-    for (const svg of svgElements) {
+    for (const svg of svgImgElements) {
         const src = svg.getAttribute('src');
         const alt = svg.getAttribute('alt');
         
@@ -37,7 +69,8 @@ async function optimizeHtml(content) {
         // Создаем новый элемент svg с использованием спрайта
         const newSvg = document.createElement('svg');
         const useElement = document.createElement('use');
-        useElement.setAttribute('href', '/assets/images/icons/sprite.svg#icon-' + iconName);
+        // Используем относительный путь для GitHub Pages
+        useElement.setAttribute('href', 'assets/images/icons/sprite.svg#icon-' + iconName);
         newSvg.appendChild(useElement);
         
         // Копируем атрибуты из оригинального изображения, исключая ненужные
