@@ -163,6 +163,12 @@ async function optimizeHtml(content) {
         .replace(/=""/g, '')
         .replace(/&amp;/g, '&');
     
+    // Replace javascript:void(0) with href="#"
+    const voidPattern = /<a[^>]*\shref=["']javascript:void\(0\)["'][^>]*>/gi;
+    optimizedContent = optimizedContent.replace(voidPattern, (match) => {
+        return match.replace(/href=["']javascript:void\(0\)["']/, 'href="#"');
+    });
+    
     return optimizedContent;
 }
 
