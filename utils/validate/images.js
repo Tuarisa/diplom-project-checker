@@ -10,24 +10,11 @@ const {
     resolveImagesPath,
     resolveAssetsPath 
 } = require('../paths');
+const { logValidationErrors } = require('../validation-logger');
 
 async function validateImages() {
     try {
-        const fileErrors = new Map();
-
-        const addError = (file, message, lineNumber = '', context = '') => {
-            if (!fileErrors.has(file)) {
-                fileErrors.set(file, []);
-            }
-            const errors = fileErrors.get(file);
-            const fullPath = resolveWorkingPath(file);
-            
-            let errorMsg = `   #${errors.length + 1} 🔴 ${fullPath}`;
-            if (lineNumber) errorMsg += `:${lineNumber}`;
-            errorMsg += `\n      • ${message}`;
-            if (context) errorMsg += `\n      • Context: ${context.trim()}`;
-            errors.push(errorMsg);
-        };
+        const allErrors = [];
 
         // Validate HTML files for image references
         const files = await fs.readdir(WORKING_DIR);
@@ -50,22 +37,22 @@ async function validateImages() {
 
                 // Check for missing alt attribute
                 if (!alt) {
-                    addError(
-                        file,
-                        'Missing alt attribute',
-                        lineNumber,
-                        img.outerHTML
-                    );
+                    allErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Missing alt attribute',
+                        context: img.outerHTML
+                    });
                 }
 
                 // Check for missing width/height attributes
                 if (!width || !height) {
-                    addError(
-                        file,
-                        'Missing width or height attribute',
-                        lineNumber,
-                        img.outerHTML
-                    );
+                    allErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Missing width or height attribute',
+                        context: img.outerHTML
+                    });
                 }
 
                 // Check if image file exists
@@ -74,20 +61,20 @@ async function validateImages() {
                     try {
                         await fs.access(imgPath);
                     } catch {
-                        addError(
-                            file,
-                            `Image file not found: ${src}`,
-                            lineNumber,
-                            img.outerHTML
-                        );
+                        allErrors.push({
+                            filePath,
+                            line: lineNumber,
+                            message: `Image file not found: ${src}`,
+                            context: img.outerHTML
+                        });
                     }
                 } else {
-                    addError(
-                        file,
-                        'Missing src attribute',
-                        lineNumber,
-                        img.outerHTML
-                    );
+                    allErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Missing src attribute',
+                        context: img.outerHTML
+                    });
                 }
             }
         }
@@ -102,7 +89,6 @@ async function validateImages() {
                 const stats = await fs.stat(fullPath);
 
                 if (stats.isDirectory()) {
-                    // Рекурсивно проверяем поддиректории
                     await validateImagesInDir(fullPath, itemRelativePath, isAssetsDir);
                 } else {
                     const ext = path.extname(item).toLowerCase();
@@ -110,19 +96,21 @@ async function validateImages() {
 
                     // Пропускаем системные файлы
                     if (item === '.DS_Store' || item === 'Thumbs.db') {
-                        addError(
-                            path.join(isAssetsDir ? path.join(ASSETS_DIR, 'images') : IMAGES_DIR, itemRelativePath),
-                            'System file found in images directory'
-                        );
+                        allErrors.push({
+                            filePath: resolveWorkingPath(path.join(isAssetsDir ? path.join(ASSETS_DIR, 'images') : IMAGES_DIR, itemRelativePath)),
+                            line: 1,
+                            message: 'System file found in images directory'
+                        });
                         continue;
                     }
 
                     // Проверяем расширение файла
                     if (!validExtensions.includes(ext)) {
-                        addError(
-                            path.join(isAssetsDir ? path.join(ASSETS_DIR, 'images') : IMAGES_DIR, itemRelativePath),
-                            'Invalid image file extension'
-                        );
+                        allErrors.push({
+                            filePath: resolveWorkingPath(path.join(isAssetsDir ? path.join(ASSETS_DIR, 'images') : IMAGES_DIR, itemRelativePath)),
+                            line: 1,
+                            message: 'Invalid image file extension'
+                        });
                         continue;
                     }
 
@@ -136,26 +124,29 @@ async function validateImages() {
 
                             // Проверяем размеры изображения
                             if (metadata.width > 2000 || metadata.height > 2000) {
-                                addError(
-                                    path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath),
-                                    `Image dimensions too large: ${metadata.width}x${metadata.height}px`
-                                );
+                                allErrors.push({
+                                    filePath: resolveWorkingPath(path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath)),
+                                    line: 1,
+                                    message: `Image dimensions too large: ${metadata.width}x${metadata.height}px`
+                                });
                             }
 
                             // Проверяем размер файла
                             const stats = await fs.stat(fullPath);
                             const fileSizeMB = stats.size / (1024 * 1024);
                             if (fileSizeMB > 1) {
-                                addError(
-                                    path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath),
-                                    `Image file size too large: ${fileSizeMB.toFixed(2)}MB`
-                                );
+                                allErrors.push({
+                                    filePath: resolveWorkingPath(path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath)),
+                                    line: 1,
+                                    message: `Image file size too large: ${fileSizeMB.toFixed(2)}MB`
+                                });
                             }
                         } catch (error) {
-                            addError(
-                                path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath),
-                                `Error processing image: ${error.message}`
-                            );
+                            allErrors.push({
+                                filePath: resolveWorkingPath(path.join(path.join(ASSETS_DIR, 'images'), itemRelativePath)),
+                                line: 1,
+                                message: `Error processing image: ${error.message}`
+                            });
                         }
                     }
                 }
@@ -166,7 +157,11 @@ async function validateImages() {
         try {
             await validateImagesInDir(resolveImagesPath(), '');
         } catch (error) {
-            addError('images', `Error accessing images directory: ${error.message}`);
+            allErrors.push({
+                filePath: resolveWorkingPath(IMAGES_DIR),
+                line: 1,
+                message: `Error accessing images directory: ${error.message}`
+            });
         }
 
         // Validate assets/images recursively
@@ -174,25 +169,22 @@ async function validateImages() {
             const assetsImagesPath = path.join(resolveAssetsPath(), 'images');
             await validateImagesInDir(assetsImagesPath, '', true);
         } catch (error) {
-            addError('assets/images', `Error accessing assets/images directory: ${error.message}`);
+            allErrors.push({
+                filePath: resolveWorkingPath(path.join(ASSETS_DIR, 'images')),
+                line: 1,
+                message: `Error accessing assets/images directory: ${error.message}`
+            });
         }
 
-        // Format output with file headers and separators
-        const result = [];
-        for (const [file, errors] of fileErrors) {
-            if (errors.length > 0) {
-                // Add file header
-                result.push(`\n📁 Checking ${file}...`);
-                result.push('─'.repeat(50));
-                result.push(...errors);
-                result.push('─'.repeat(50));
-            }
-        }
-
-        return result;
+        logValidationErrors(resolveWorkingPath('images'), 'Images', allErrors);
+        return allErrors;
     } catch (error) {
         console.error('Error during image validation:', error);
-        return [`Error during image validation: ${error.message}`];
+        return [{
+            filePath: resolveWorkingPath('images'),
+            line: 1,
+            message: `Error during image validation: ${error.message}`
+        }];
     }
 }
 

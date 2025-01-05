@@ -7,24 +7,11 @@ const {
     IMAGES_DIR,
     resolveWorkingPath 
 } = require('../paths');
+const { logValidationErrors } = require('../validation-logger');
 
 async function validateStructure() {
     try {
-        const fileErrors = new Map();
-
-        const addError = (file, message, lineNumber = '', context = '') => {
-            if (!fileErrors.has(file)) {
-                fileErrors.set(file, []);
-            }
-            const errors = fileErrors.get(file);
-            const fullPath = resolveWorkingPath(file);
-            
-            let errorMsg = `   #${errors.length + 1} 🔴 ${fullPath}`;
-            if (lineNumber) errorMsg += `:${lineNumber}`;
-            errorMsg += `\n      • ${message}`;
-            if (context) errorMsg += `\n      • Context: ${context.trim()}`;
-            errors.push(errorMsg);
-        };
+        const allErrors = [];
 
         // Check required directories
         const requiredDirs = [STYLES_DIR, IMAGES_DIR, ASSETS_DIR];
@@ -32,7 +19,10 @@ async function validateStructure() {
             try {
                 await fs.access(resolveWorkingPath(dir));
             } catch {
-                addError('structure', `Required directory not found: ${dir}`);
+                allErrors.push({
+                    filePath: 'structure',
+                    message: `Required directory not found: ${dir}`
+                });
             }
         }
 
@@ -40,7 +30,10 @@ async function validateStructure() {
         try {
             await fs.access(resolveWorkingPath('index.html'));
         } catch {
-            addError('structure', 'Main page (index.html) not found in root directory');
+            allErrors.push({
+                filePath: 'structure',
+                message: 'Main page (index.html) not found in root directory'
+            });
         }
 
         // Рекурсивная функция для проверки файлов в директории
@@ -58,27 +51,30 @@ async function validateStructure() {
                 const stats = await fs.stat(fullPath);
 
                 if (stats.isDirectory()) {
-                    // Проверяем, является ли это директорией изображений
-                    if (dirPath === resolveWorkingPath(IMAGES_DIR)) {
-                        // В директории изображений разрешаем поддиректории
-                        await validateDir(fullPath, itemRelativePath);
-                    } else {
-                        // Рекурсивно проверяем остальные директории
-                        await validateDir(fullPath, itemRelativePath);
-                    }
+                    await validateDir(fullPath, itemRelativePath);
                 } else {
                     // Check for system files
                     if (item === '.DS_Store' || item === 'Thumbs.db') {
-                        addError('structure', `System file found in repository: ${itemRelativePath}`);
+                        allErrors.push({
+                            filePath: 'structure',
+                            
+                            message: `System file found in repository: ${itemRelativePath}`
+                        });
                     }
 
                     // Check file naming
                     if (item !== item.toLowerCase() && item !== 'README.md') {
-                        addError('structure', `File name should be lowercase: ${itemRelativePath}`);
+                        allErrors.push({
+                            filePath: 'structure',
+                            message: `File name should be lowercase: ${itemRelativePath}`
+                        });
                     }
 
                     if (item.includes(' ')) {
-                        addError('structure', `File name should not contain spaces: ${itemRelativePath}`);
+                        allErrors.push({
+                            filePath: 'structure',
+                            message: `File name should not contain spaces: ${itemRelativePath}`
+                        });
                     }
 
                     // Check file extensions
@@ -87,7 +83,10 @@ async function validateStructure() {
                         
                         // Check for empty files
                         if (!content.trim()) {
-                            addError('structure', `Empty HTML file: ${itemRelativePath}`);
+                            allErrors.push({
+                                filePath: 'structure',
+                                message: `Empty HTML file: ${itemRelativePath}`
+                            });
                         }
                     }
 
@@ -102,7 +101,11 @@ async function validateStructure() {
                     ];
 
                     if (unnecessaryPatterns.some(pattern => pattern.test(item))) {
-                        addError('structure', `Unnecessary file found: ${fullPath}`);
+                        allErrors.push({
+                            filePath: 'structure',
+                            
+                            message: `Unnecessary file found: ${fullPath}`
+                        });
                     }
                 }
             }
@@ -119,12 +122,18 @@ async function validateStructure() {
             );
             
             if (!hasNormalize) {
-                addError('structure', 'Normalize.css not found in css directory');
+                allErrors.push({
+                    filePath: 'structure',                
+                    message: 'Normalize.css not found in css directory'
+                });
             }
 
             for (const file of cssFiles) {
                 if (!file.endsWith('.css') && !file.endsWith('.scss')) {
-                    addError('structure', `Non-style file found in styles directory: ${file}`);
+                    allErrors.push({
+                        filePath: 'structure',
+                        message: `Non-style file found in styles directory: ${file}`
+                    });
                 }
             }
         } catch {
@@ -141,14 +150,16 @@ async function validateStructure() {
                 const stats = await fs.stat(fullPath);
 
                 if (stats.isDirectory()) {
-                    // Рекурсивно проверяем поддиректории
                     await validateImagesDir(fullPath, itemRelativePath);
                 } else {
                     const ext = path.extname(item).toLowerCase();
                     const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'];
                     
                     if (!validExtensions.includes(ext) && item !== '.DS_Store' && item !== 'Thumbs.db') {
-                        addError('structure', `Non-image file found in images directory: ${itemRelativePath}`);
+                        allErrors.push({
+                            filePath: 'structure',
+                            message: `Non-image file found in images directory: ${itemRelativePath}`
+                        });
                     }
                 }
             }
@@ -160,22 +171,14 @@ async function validateStructure() {
             // IMG directory check already handled above
         }
 
-        // Format output with file headers and separators
-        const result = [];
-        for (const [file, errors] of fileErrors) {
-            if (errors.length > 0) {
-                // Add file header
-                result.push(`\n📁 Checking ${file}...`);
-                result.push('─'.repeat(50));
-                result.push(...errors);
-                result.push('─'.repeat(50));
-            }
-        }
-
-        return result;
+        logValidationErrors('structure', 'Structure', allErrors);
+        return allErrors;
     } catch (error) {
         console.error('Error during structure validation:', error);
-        return [`Error during structure validation: ${error.message}`];
+        return [{
+            filePath: 'structure',
+            message: `Error during structure validation: ${error.message}`
+        }];
     }
 }
 
