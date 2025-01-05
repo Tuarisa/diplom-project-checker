@@ -5,13 +5,12 @@ const { logValidationErrors } = require('../validation-logger');
 
 async function validateHTML() {
     try {
-        const errors = [];
+        const allErrors = [];
         const titles = new Map();
         const descriptions = new Map();
 
         const files = await fs.readdir(WORKING_DIR);
         const htmlFiles = files.filter(file => file.endsWith('.html'));
-        let hasErrors = false;
 
         for (const file of htmlFiles) {
             const fileErrors = [];
@@ -210,14 +209,11 @@ async function validateHTML() {
 
                 const inputs = form.querySelectorAll('input, textarea, select');
                 inputs.forEach(input => {
-                    // Ищем строку с input элементом
                     let inputLine = -1;
                     const inputHTML = input.outerHTML;
                     
-                    // Сначала ищем точное совпадение
                     inputLine = formContent.findIndex(line => line.includes(inputHTML));
                     
-                    // Если не нашли, ищем по частям (атрибуты могут быть в разном порядке)
                     if (inputLine === -1) {
                         const inputId = input.id ? `id="${input.id}"` : '';
                         const inputClass = input.className ? `class="${input.className}"` : '';
@@ -262,15 +258,18 @@ async function validateHTML() {
                 });
             }
 
-            // Log errors for this file
-            const isValid = logValidationErrors(filePath, 'HTML', fileErrors);
-            if (!isValid) hasErrors = true;
+            logValidationErrors(filePath, 'HTML', fileErrors);
+            allErrors.push(...fileErrors);
         }
 
-        return !hasErrors;
+        return allErrors;
     } catch (error) {
         console.error('Error during HTML validation:', error);
-        return false;
+        return [{
+            filePath: 'unknown',
+            line: 1,
+            message: `HTML validation failed: ${error.message}`
+        }];
     }
 }
 

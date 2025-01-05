@@ -7,7 +7,7 @@ async function validateW3C() {
     try {
         const files = await fs.readdir(WORKING_DIR);
         const htmlFiles = files.filter(file => file.endsWith('.html'));
-        let hasErrors = false;
+        const allErrors = [];
 
         for (const file of htmlFiles) {
             const fileErrors = [];
@@ -27,39 +27,6 @@ async function validateW3C() {
                             let lineNumber = message.lastLine || message.firstLine;
                             let errorContext = '';
 
-                            if (!lineNumber) {
-                                // Поиск по специфичным паттернам
-                                if (message.message.includes('element "form"') && message.message.includes('action')) {
-                                    // Ищем form без action или с пустым action
-                                    lineNumber = lines.findIndex(line => 
-                                        line.includes('<form') && (line.includes('action=""') || !line.includes('action='))
-                                    ) + 1;
-                                } else if (message.message.includes('Duplicate ID')) {
-                                    // Извлекаем ID из сообщения
-                                    const idMatch = message.message.match(/ID "([^"]+)"/);
-                                    if (idMatch) {
-                                        const id = idMatch[1];
-                                        lineNumber = lines.findIndex(line => 
-                                            line.includes(`id="${id}"`)
-                                        ) + 1;
-                                    }
-                                } else if (message.message.includes('not allowed as child of element')) {
-                                    // Извлекаем элементы из сообщения
-                                    const elements = message.message.match(/element "([^"]+)".*?element "([^"]+)"/);
-                                    if (elements) {
-                                        const [_, child, parent] = elements;
-                                        // Ищем строку где дочерний элемент находится внутри родительского
-                                        for (let i = 0; i < lines.length; i++) {
-                                            if (lines[i].includes(`<${parent}`) && 
-                                                (lines[i].includes(`<${child}`) || 
-                                                 (i + 1 < lines.length && lines[i + 1].includes(`<${child}`)))) {
-                                                lineNumber = i + 1;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
 
                             if (lineNumber && lineNumber <= lines.length) {
                                 errorContext = lines[lineNumber - 1].trim();
@@ -82,14 +49,18 @@ async function validateW3C() {
                 });
             }
 
-            const isValid = logValidationErrors(filePath, 'W3C', fileErrors);
-            if (!isValid) hasErrors = true;
+            logValidationErrors(filePath, 'W3C', fileErrors);
+            allErrors.push(...fileErrors);
         }
 
-        return !hasErrors;
+        return allErrors;
     } catch (error) {
         console.error('Error during W3C validation:', error);
-        return false;
+        return [{
+            filePath: 'unknown',
+            line: 1,
+            message: `W3C validation failed: ${error.message}`
+        }];
     }
 }
 
