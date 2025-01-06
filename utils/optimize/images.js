@@ -52,7 +52,7 @@ async function optimizeImages() {
                 const webpPath = path.join(outputDir, `${fileInfo.name}.webp`);
                 await sharp(filePath)
                     .resize(1920, 1080, { fit: 'inside', withoutEnlargement: true })
-                    .webp({ quality: 80 })
+                    .webp({ quality: 70 })
                     .toFile(webpPath);
 
                 console.log(`✅ Converted ${relativePath} to WebP`);
