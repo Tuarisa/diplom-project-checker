@@ -281,18 +281,48 @@ async function validateHTML() {
             });
 
             // Check links and buttons for accessibility
-            const clickableElements = document.querySelectorAll('a, button');
-            clickableElements.forEach(element => {
+            const accessibilityLinks = document.querySelectorAll('a');
+            accessibilityLinks.forEach(element => {
                 const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
                 const visibleText = element.textContent.trim();
                 const hasAriaLabel = element.hasAttribute('aria-label');
                 const hasChildSvgWithAriaLabel = element.querySelector('svg[aria-label]');
+                const hasAriaLabelledBy = element.hasAttribute('aria-labelledby');
                 
-                if (!visibleText && !hasAriaLabel && !hasChildSvgWithAriaLabel) {
+                if (!visibleText && !hasAriaLabel && !hasChildSvgWithAriaLabel && !hasAriaLabelledBy) {
                     fileErrors.push({
                         filePath,
                         line: lineNumber,
-                        message: `${element.tagName.toLowerCase()} has no text content and no accessibility attributes (aria-label or aria-label on SVG)`,
+                        message: `Link must have descriptive text or accessibility attributes (aria-label, aria-labelledby, or SVG with aria-label) to indicate where it leads`,
+                        context: element.outerHTML
+                    });
+                }
+            });
+
+            const buttons = document.querySelectorAll('button');
+            buttons.forEach(element => {
+                const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
+                const visibleText = element.textContent.trim();
+                const hasAriaLabel = element.hasAttribute('aria-label');
+                const hasTitle = element.hasAttribute('title');
+                const hasChildSvgWithAriaLabel = element.querySelector('svg[aria-label]');
+                const hasAriaLabelledBy = element.hasAttribute('aria-labelledby');
+                const hasType = element.hasAttribute('type');
+                
+                if (!visibleText && !hasAriaLabel && !hasChildSvgWithAriaLabel && !hasTitle && !hasAriaLabelledBy) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: `Button must have descriptive text or accessibility attributes (aria-label, title, aria-labelledby, or SVG with aria-label) to describe its action`,
+                        context: element.outerHTML
+                    });
+                }
+
+                if (!hasType) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Button must have type attribute (button, submit, or reset)',
                         context: element.outerHTML
                     });
                 }
@@ -418,5 +448,4 @@ async function validateHTML() {
     }
 }
 
-module.exports = validateHTML; 
 module.exports = validateHTML; 
