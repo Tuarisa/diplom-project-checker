@@ -23,7 +23,8 @@
     "format": "node utils/format.js",
     "setup-git": "node utils/setup-git-hooks.js",
     "cleanup": "node utils/cleanup-repo.js",
-    "setup": "yarn sync && yarn cleanup && yarn setup-git && yarn validate"
+    "setup": "yarn sync && yarn cleanup && yarn setup-git && yarn validate",
+    "optimize:purgecss": "node utils/optimize/purgecss.js"
   },
   "dependencies": {
     "browser-sync": "^2.29.3",
@@ -41,7 +42,8 @@
     "prettier": "^3.1.1",
     "sass": "^1.69.5",
     "sharp": "^0.33.1",
-    "svg-sprite": "^2.0.4"
+    "svg-sprite": "^2.0.4",
+    "purgecss": "^5.0.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
