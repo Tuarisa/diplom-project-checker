@@ -238,6 +238,24 @@ async function validateHTML() {
                 });
             }
 
+            // Check text emphasis elements nesting
+            const emphasisElements = document.querySelectorAll('strong, em, b, i, mark, small, del, ins, sub, sup');
+            const validParents = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'figcaption', 'li', 'td', 'th', 'label', 'a'];
+            
+            emphasisElements.forEach(element => {
+                const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
+                const hasValidParent = element.parentElement && validParents.includes(element.parentElement.tagName.toLowerCase());
+                
+                if (!hasValidParent) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: `${element.tagName.toLowerCase()} tag must be nested inside a text block element (${validParents.join(', ')})`,
+                        context: element.outerHTML
+                    });
+                }
+            });
+
             // Check images
             const images = document.querySelectorAll('img');
             images.forEach(img => {
