@@ -7,10 +7,26 @@ const { logValidationErrors } = require('../validation-logger');
 function getNormalizedStructure(element) {
     if (!element) return '';
     const clone = element.cloneNode(true);
+    
+    // Remove href attributes from links
     const links = clone.getElementsByTagName('a');
     for (const link of links) {
         link.removeAttribute('href');
+        link.removeAttribute('disabled');
     }
+
+    // Remove active classes
+    const elementsWithClass = clone.querySelectorAll('[class]');
+    elementsWithClass.forEach(el => {
+        const classes = el.getAttribute('class').split(' ');
+        const filteredClasses = classes.filter(cls => !cls.includes('active'));
+        if (filteredClasses.length > 0) {
+            el.setAttribute('class', filteredClasses.join(' '));
+        } else {
+            el.removeAttribute('class');
+        }
+    });
+
     return clone.innerHTML.replace(/\s+/g, ' ').trim();
 }
 
@@ -259,11 +275,11 @@ async function validateHTML() {
                         message: 'Link missing href attribute',
                         context: link.outerHTML
                     });
-                } else if (href === file) {
+                } else if (href === file && !link.hasAttribute('disabled')) {
                     fileErrors.push({
                         filePath,
                         line: lineNumber,
-                        message: 'Link points to the current page without a specific section',
+                        message: 'Link pointing to the current page must have disabled attribute',
                         context: link.outerHTML
                     });
                 } else if (href.startsWith('/') && !htmlFiles.includes(href.slice(1))) {
