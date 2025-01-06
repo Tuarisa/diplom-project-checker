@@ -246,6 +246,19 @@ async function validateHTML() {
                 const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
                 const hasValidParent = element.parentElement && validParents.includes(element.parentElement.tagName.toLowerCase());
                 
+                // Check if strong wraps img or svg
+                if (element.tagName.toLowerCase() === 'strong') {
+                    const hasImgOrSvg = element.querySelector('img, svg');
+                    if (hasImgOrSvg) {
+                        fileErrors.push({
+                            filePath,
+                            line: lineNumber,
+                            message: 'Strong tag should not be used to wrap images or SVG elements as it is semantically incorrect',
+                            context: element.outerHTML
+                        });
+                    }
+                }
+
                 if (!hasValidParent) {
                     fileErrors.push({
                         filePath,

@@ -44,8 +44,8 @@ async function validateBEM() {
 
                     // Check for presentational class names
                     if (
-                        /^(fz|fs|color|bg|margin|padding|left|right|top|bottom|block)/.test(className) ||
-                        /(left|right|center|bold|italic)$/.test(className)
+                        /^(fz|fs|color|bg|margin|padding|left|right|top|bottom|block)-/.test(className) ||
+                        /--(left|right|center|bold|italic)$/.test(className)
                     ) {
                         fileErrors.push({
                             filePath,
@@ -61,7 +61,9 @@ async function validateBEM() {
                     element.children.length === 1 &&
                     !element.textContent.trim() &&
                     !element.querySelector('img') &&
-                    !element.classList.contains('visually-hidden')
+                    !element.classList.contains('visually-hidden') &&
+                    element.tagName.toLowerCase() !== 'svg' &&
+                    element.tagName.toLowerCase() !== 'a'
                 ) {
                     fileErrors.push({
                         filePath,
