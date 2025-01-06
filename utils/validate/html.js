@@ -268,12 +268,13 @@ async function validateHTML() {
                 const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
                 const visibleText = element.textContent.trim();
                 const hasAriaLabel = element.hasAttribute('aria-label');
+                const hasChildSvgWithAriaLabel = element.querySelector('svg[aria-label]');
                 
-                if (!visibleText && !hasAriaLabel) {
+                if (!visibleText && !hasAriaLabel && !hasChildSvgWithAriaLabel) {
                     fileErrors.push({
                         filePath,
                         line: lineNumber,
-                        message: `${element.tagName.toLowerCase()} has no text content and no accessibility attributes (aria-label, aria-labelledby, or title)`,
+                        message: `${element.tagName.toLowerCase()} has no text content and no accessibility attributes (aria-label or aria-label on SVG)`,
                         context: element.outerHTML
                     });
                 }
