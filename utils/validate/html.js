@@ -354,11 +354,11 @@ async function validateHTML() {
                         message: 'Link missing href attribute',
                         context: link.outerHTML
                     });
-                } else if (href === file && !link.hasAttribute('disabled')) {
+                } else if (href === file && !link.classList.contains('active')) {
                     fileErrors.push({
                         filePath,
                         line: lineNumber,
-                        message: 'Link pointing to the current page must have disabled attribute',
+                        message: 'Link pointing to the current page must have active class',
                         context: link.outerHTML
                     });
                 } else if (href.startsWith('/') && !htmlFiles.includes(href.slice(1))) {
