@@ -238,16 +238,38 @@ async function validateHTML() {
                 });
             }
 
+            // Check images
+            const images = document.querySelectorAll('img');
+            images.forEach(img => {
+                const lineNumber = content.split('\n').findIndex(line => line.includes(img.outerHTML)) + 1;
+                
+                if (!img.hasAttribute('alt')) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Image missing alt attribute',
+                        context: img.outerHTML
+                    });
+                }
+                
+                if (!img.hasAttribute('width') || !img.hasAttribute('height')) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Image missing width or height attribute',
+                        context: img.outerHTML
+                    });
+                }
+            });
+
             // Check links and buttons for accessibility
             const clickableElements = document.querySelectorAll('a, button');
             clickableElements.forEach(element => {
                 const lineNumber = content.split('\n').findIndex(line => line.includes(element.outerHTML)) + 1;
                 const visibleText = element.textContent.trim();
                 const hasAriaLabel = element.hasAttribute('aria-label');
-                const hasAriaLabelledBy = element.hasAttribute('aria-labelledby');
-                const hasTitle = element.hasAttribute('title');
                 
-                if (!visibleText && !hasAriaLabel && !hasAriaLabelledBy && !hasTitle) {
+                if (!visibleText && !hasAriaLabel) {
                     fileErrors.push({
                         filePath,
                         line: lineNumber,
