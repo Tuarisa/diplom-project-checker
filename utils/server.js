@@ -6,6 +6,7 @@ const { execSync } = require('child_process');
 const { watch } = require('fs');
 const fs = require('fs').promises;
 const { WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR } = require('./paths');
+const { purgeStyles } = require('./optimize/purgecss');
 
 console.log(WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR);
 
@@ -37,47 +38,35 @@ app.set('views', path.join(__dirname, 'tree/templates'));
 // Import tree module
 const treeRouter = require('./tree');
 
-// Функция для компиляции SCSS
+// Функция для компиляции SCSS с использованием purgeStyles
 async function compileSass() {
     try {
-        const assetsStylesDir = path.join(WORKING_DIR, 'assets', STYLES_DIR);
-        await fs.mkdir(assetsStylesDir, { recursive: true });
-        
-        // Компилируем SCSS в CSS
-        execSync(`sass ${path.join(WORKING_DIR, 'styles/style.scss')} ${path.join(WORKING_DIR, 'assets/styles/style.css')}`, {
-            stdio: 'inherit'
-        });
-        
-        console.log('✨ SCSS compiled successfully!');
+        await purgeStyles();
+        console.log('✨ SCSS compiled and processed successfully!');
         return true;
     } catch (error) {
-        console.error('Error compiling SCSS:', error.message);
+        console.error('Error processing SCSS:', error.message);
         return false;
     }
 }
 
-// Функция для минификации CSS
-async function minifyCSS() {
+// Функция для минификации normalize.css
+async function minifyNormalize() {
     try {
         const assetsStylesDir = path.join(WORKING_DIR, 'assets', 'styles');
         await fs.mkdir(assetsStylesDir, { recursive: true });
         
-        // Минифицируем style.css
-        execSync(`cleancss -o ${path.join(assetsStylesDir, 'style.min.css')} ${path.join(WORKING_DIR, 'assets', 'styles', 'style.css')}`, {
-            stdio: 'inherit'
-        });
-        
-        // Минифицируем normalize.css
+        // Минифицируем только normalize.css
         execSync(`cleancss -o ${path.join(assetsStylesDir, 'normalize.min.css')} ${path.join(WORKING_DIR, 'styles', 'normalize.css')}`, {
             stdio: 'inherit'
         });
         
-        console.log('✨ CSS files minified successfully!');
+        console.log('✨ normalize.css minified successfully!');
         
         // Trigger livereload for CSS files
         liveReloadServer.refresh('*.css');
     } catch (error) {
-        console.error('Error minifying CSS:', error.message);
+        console.error('Error minifying normalize.css:', error.message);
     }
 }
 
@@ -111,9 +100,11 @@ app.get('/', (req, res) => {
 });
 
 // Watch HTML files in root directory
-watch(WORKING_DIR, { recursive: false }, (eventType, filename) => {
+watch(WORKING_DIR, { recursive: false }, async (eventType, filename) => {
     if (filename && filename.endsWith('.html')) {
         console.log('HTML file changes detected:', filename);
+        // При изменении HTML перекомпилируем стили, так как могли измениться используемые классы
+        await compileSass();
         liveReloadServer.refresh(filename);
     }
 });
@@ -122,19 +113,14 @@ watch(WORKING_DIR, { recursive: false }, (eventType, filename) => {
 watch(path.join(WORKING_DIR, STYLES_DIR), { recursive: true }, async (eventType, filename) => {
     if (filename && filename.endsWith('.scss')) {
         console.log('SCSS file changes detected, recompiling...');
-        const compiled = await compileSass();
-        if (compiled) {
-            await minifyCSS();
-        }
+        await compileSass();
     }
 });
 
 // Инициализация: компилируем SCSS и минифицируем CSS при запуске
 (async () => {
-    const compiled = await compileSass();
-    if (compiled) {
-        await minifyCSS();
-    }
+    await minifyNormalize();
+    await compileSass();
 })();
 
 // Запускаем сервер
