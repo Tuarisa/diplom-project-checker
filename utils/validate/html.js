@@ -433,6 +433,22 @@ async function validateHTML() {
                 });
             }
 
+            // Check inputs are within forms
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                const lineNumber = content.split('\n').findIndex(line => line.includes(input.outerHTML)) + 1;
+                const isWithinForm = input.closest('form');
+                
+                if (!isWithinForm) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Input element must be nested within a form element',
+                        context: input.outerHTML
+                    });
+                }
+            });
+
             logValidationErrors(filePath, 'HTML', fileErrors);
             allErrors.push(...fileErrors);
         }
