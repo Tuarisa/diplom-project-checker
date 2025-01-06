@@ -2,6 +2,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const { PurgeCSS } = require('purgecss');
 const { execSync } = require('child_process');
+const postcss = require('postcss');
+const autoprefixer = require('autoprefixer');
 const { 
     WORKING_DIR,
     resolveWorkingPath,
@@ -173,20 +175,36 @@ async function purgeStyles() {
         if (result.length > 0) {
             const purgedContent = result[0].css;
             
-            // Save purged content back to the files
-            await fs.writeFile(cssFile, purgedContent);
+            console.log('📦 Adding vendor prefixes with Autoprefixer...');
+            
+            // Process with PostCSS and Autoprefixer
+            const prefixed = await postcss([
+                autoprefixer({
+                    overrideBrowserslist: [
+                        'last 2 versions',
+                        '> 1%',
+                        'not dead'
+                    ]
+                })
+            ]).process(purgedContent, { 
+                from: undefined, // Prevent source map warning
+                to: cssFile 
+            });
+            
+            // Save processed content
+            await fs.writeFile(cssFile, prefixed.css);
             
             // Create minified version using clean-css-cli
             execSync(`cleancss -o ${path.join(assetsStylesDir, 'style.min.css')} ${cssFile}`, { stdio: 'inherit' });
 
-            console.log('✅ Created purged CSS files:');
+            console.log('✅ Created processed CSS files:');
             console.log('   - assets/styles/style.css');
             console.log('   - assets/styles/style.min.css');
         }
 
-        console.log('✨ CSS purging completed successfully!');
+        console.log('✨ CSS processing completed successfully!');
     } catch (error) {
-        console.error('❌ Error during CSS purging:', error.message);
+        console.error('❌ Error during CSS processing:', error.message);
         throw error;
     }
 }
