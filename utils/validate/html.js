@@ -449,6 +449,52 @@ async function validateHTML() {
                 }
             });
 
+            // Check forms structure
+            const formElements = document.querySelectorAll('form');
+            formElements.forEach(form => {
+                const formLineNumber = content.split('\n').findIndex(line => line.includes(form.outerHTML)) + 1;
+                
+                // Get all direct input groups (inputs that are siblings)
+                const formInputs = form.querySelectorAll('input, select, textarea');
+                const inputGroups = new Map(); // parent element -> number of inputs
+                
+                formInputs.forEach(input => {
+                    const parent = input.parentElement;
+                    if (parent && parent !== form) {
+                        inputGroups.set(parent, (inputGroups.get(parent) || 0) + 1);
+                    }
+                });
+
+                // Check if groups of inputs are wrapped in fieldset
+                inputGroups.forEach((count, parent) => {
+                    if (count >= 2 && parent.tagName.toLowerCase() !== 'fieldset') {
+                        const lineNumber = content.split('\n').findIndex(line => line.includes(parent.outerHTML)) + 1;
+                        fileErrors.push({
+                            filePath,
+                            line: lineNumber,
+                            message: 'Group of related form controls should be wrapped in a fieldset element',
+                            context: parent.outerHTML
+                        });
+                    }
+                });
+
+                // Check fieldsets
+                const fieldsets = form.querySelectorAll('fieldset');
+                fieldsets.forEach(fieldset => {
+                    const fieldsetLineNumber = content.split('\n').findIndex(line => line.includes(fieldset.outerHTML)) + 1;
+                    const firstChild = fieldset.firstElementChild;
+                    
+                    if (!firstChild || firstChild.tagName.toLowerCase() !== 'legend') {
+                        fileErrors.push({
+                            filePath,
+                            line: fieldsetLineNumber,
+                            message: 'Fieldset must have legend as its first child element',
+                            context: fieldset.outerHTML
+                        });
+                    }
+                });
+            });
+
             logValidationErrors(filePath, 'HTML', fileErrors);
             allErrors.push(...fileErrors);
         }
