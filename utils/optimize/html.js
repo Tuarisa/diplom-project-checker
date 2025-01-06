@@ -20,6 +20,10 @@ const EXCLUDED_ATTRIBUTES = ['src', 'alt'];
 
 async function optimizeHtml(content) {
     console.log('Processing HTML content...');
+    
+    // Preserve line break entities at the very beginning
+    content = content.replace(/&#10;/g, '__LINE_BREAK__');
+    
     const dom = new JSDOM(content);
     const document = dom.window.document;
 
@@ -128,6 +132,9 @@ async function optimizeHtml(content) {
         bracketSameLine: true,
         singleAttributePerLine: false
     });
+
+    // Restore line break entities after all formatting
+    optimizedContent = optimizedContent.replace(/__LINE_BREAK__/g, '&#10;');
 
     // Форматируем ссылки в head в одну строку
     const headPattern = /(<head[^>]*>)([\s\S]*?)(<\/head>)/i;
