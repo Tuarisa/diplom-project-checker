@@ -7,6 +7,7 @@ const WORKING_DIR = process.env.WORKING_DIR;
 const ASSETS_DIR = process.env.ASSETS_DIR || 'assets';
 const STYLES_DIR = process.env.STYLES_DIR || 'styles';
 const IMAGES_DIR = process.env.IMAGES_DIR || 'images';
+const HTML_DIR = process.env.HTML_DIR || '.';
 const SPRITE_PATH = process.env.SPRITE_PATH || 'assets/images/icons/sprite.svg';
 
 // Функции для работы с путями
@@ -24,6 +25,10 @@ function resolveStylesPath(...parts) {
 
 function resolveImagesPath(...parts) {
     return resolveWorkingPath(IMAGES_DIR, ...parts);
+}
+
+function resolveHtmlPath(...parts) {
+    return resolveWorkingPath(HTML_DIR, ...parts);
 }
 
 function getRelativePath(absolutePath) {
@@ -58,11 +63,13 @@ module.exports = {
     ASSETS_DIR,
     STYLES_DIR,
     IMAGES_DIR,
+    HTML_DIR,
     SPRITE_PATH,
     resolveWorkingPath,
     resolveAssetsPath,
     resolveStylesPath,
     resolveImagesPath,
+    resolveHtmlPath,
     getRelativePath,
     getSpritePath,
     getProjectFiles,
