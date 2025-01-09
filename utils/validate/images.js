@@ -55,17 +55,36 @@ async function validateImages() {
                     });
                 }
 
+                // Check if path is absolute (starts with /)
+                if (src.startsWith('/')) {
+                    allErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Image path should be relative (should not start with /)',
+                        context: img.outerHTML,
+                        suggestion: `Change path to relative: ${src.substring(1)}`
+                    });
+                }
+
                 // Check if image file exists and has correct format
                 if (src) {
-                    const imgPath = resolveImagesPath(src.replace(/^images\//, ''));
+                    let imgPath;
+                    if (src.startsWith('assets/')) {
+                        // Для путей, начинающихся с assets/
+                        imgPath = resolveWorkingPath(src);
+                    } else {
+                        // Для остальных путей используем resolveImagesPath
+                        imgPath = resolveImagesPath(src.replace(/^images\//, ''));
+                    }
+                    
                     try {
                         await fs.access(imgPath);
                         // Проверяем расширение файла
-                        if (!src.toLowerCase().endsWith('.webp')) {
+                        if (!src.toLowerCase().endsWith('.webp') && !src.toLowerCase().endsWith('.svg')) {
                             allErrors.push({
                                 filePath,
                                 line: lineNumber,
-                                message: 'Image must be in WebP format',
+                                message: 'Image must be in WebP or SVG format',
                                 context: img.outerHTML
                             });
                         }
@@ -73,7 +92,7 @@ async function validateImages() {
                         allErrors.push({
                             filePath,
                             line: lineNumber,
-                            message: `Image file not found: ${src}`,
+                            message: `Image file not found: ${src} (looked in ${imgPath})`,
                             context: img.outerHTML
                         });
                     }
