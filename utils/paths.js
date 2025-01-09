@@ -7,7 +7,8 @@ const WORKING_DIR = process.env.WORKING_DIR;
 const ASSETS_DIR = process.env.ASSETS_DIR || 'assets';
 const STYLES_DIR = process.env.STYLES_DIR || 'styles';
 const IMAGES_DIR = process.env.IMAGES_DIR || 'images';
-const HTML_DIR = process.env.HTML_DIR || '.';
+const HTML_DIR = process.env.HTML_DIR || '.';   
+const JS_DIR = process.env.JS_DIR || 'js';
 const SPRITE_PATH = process.env.SPRITE_PATH || 'assets/images/icons/sprite.svg';
 
 // Функции для работы с путями
