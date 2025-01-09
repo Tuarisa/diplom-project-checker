@@ -13,6 +13,45 @@ const defaultBlockElements = new Set([
     'nav', 'main', 'form', 'ul', 'ol', 'li'
 ]);
 
+// List of CSS properties that are inheritable
+const inheritableProperties = new Set([
+    // Text properties
+    'color',
+    'font',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-variant',
+    'font-style',
+    'line-height',
+    'letter-spacing',
+    'text-align',
+    'text-indent',
+    'text-transform',
+    'white-space',
+    'word-spacing',
+    'word-break',
+    'word-wrap',
+    'text-shadow',
+    
+    // List properties
+    'list-style',
+    'list-style-type',
+    'list-style-position',
+    'list-style-image',
+    
+    // Table properties
+    'border-collapse',
+    'border-spacing',
+    'caption-side',
+    'empty-cells',
+    
+    // Other
+    'cursor',
+    'visibility',
+    'vertical-align'
+]);
+
 // Function to get HTML string representation of an element
 function getElementHTML(node) {
     let html = `<${node.nodeName}`;
@@ -148,42 +187,110 @@ function hasPartialOverlap(value1, value2) {
     return shorter.every((part, index) => part === longer[index]) && shorter.length !== longer.length;
 }
 
+// Function to check if selector contains pseudo-elements or pseudo-classes
+function hasPseudoElementsOrClasses(selector) {
+    const pseudoPattern = /:[a-zA-Z]/;
+    return pseudoPattern.test(selector);
+}
+
 // Function to check property duplications
 function checkPropertyDuplications(content, filePath, fileErrors) {
     const root = postcss.parse(content, { parser: scss });
-    
+    const selectorProperties = new Map();
+
+    // First pass: collect all properties by their full selectors
     root.walkRules(rule => {
-        // Skip pseudo-classes and pseudo-elements
-        if (rule.selector.includes(':')) {
+        // Skip pseudo-elements and pseudo-classes
+        if (hasPseudoElementsOrClasses(rule.selector)) {
             return;
         }
+
+        const selector = rule.selector;
+        if (!selectorProperties.has(selector)) {
+            selectorProperties.set(selector, new Map());
+        }
         
-        const properties = new Map();
+        const properties = selectorProperties.get(selector);
         
         rule.walkDecls(decl => {
-            const prop = decl.prop;
-            
-            if (properties.has(prop)) {
-                const prevDecl = properties.get(prop);
-                
-                // Check if values are exactly the same or have partial overlap
-                if (prevDecl.value === decl.value || 
-                    (isShorthandProperty(prop) && hasPartialOverlap(prevDecl.value, decl.value))) {
-                    fileErrors.push({
-                        filePath,
-                        line: decl.source.start.line,
-                        message: prevDecl.value === decl.value ? 
-                            `Duplicate property "${prop}" with identical values` :
-                            `Property "${prop}" has overlapping values`,
-                        context: `Previous: ${prop}: ${prevDecl.value} (${prevDecl.source.input.file}:${prevDecl.source.start.line})\nCurrent: ${prop}: ${decl.value} (${decl.source.input.file}:${decl.source.start.line})`,
-                        suggestion: prevDecl.value === decl.value ?
-                            'Remove duplicate property' :
-                            'Use individual properties instead of shorthand with partial overlap'
+            // Only track inheritable properties
+            if (!inheritableProperties.has(decl.prop)) {
+                return;
+            }
+
+            if (!properties.has(decl.prop)) {
+                properties.set(decl.prop, []);
+            }
+            properties.get(decl.prop).push({
+                value: decl.value,
+                line: decl.source.start.line,
+                decl: decl
+            });
+        });
+    });
+
+    // Second pass: check for duplicates within same selector
+    for (const [selector, properties] of selectorProperties) {
+        for (const [prop, declarations] of properties) {
+            if (declarations.length > 1) {
+                // Check for exact duplicates within same selector
+                declarations.forEach((decl, index) => {
+                    for (let i = index + 1; i < declarations.length; i++) {
+                        const otherDecl = declarations[i];
+                        if (decl.value === otherDecl.value) {
+                            fileErrors.push({
+                                filePath,
+                                line: otherDecl.line,
+                                message: `Duplicate inheritable property "${prop}" within same selector`,
+                                context: `Previous: ${prop}: ${decl.value} (line: ${decl.line})\nCurrent: ${prop}: ${otherDecl.value} (line: ${otherDecl.line})`,
+                                suggestion: 'Remove duplicate property within the same selector'
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    // Third pass: check for parent-child inheritance issues
+    root.walkRules(rule => {
+        if (hasPseudoElementsOrClasses(rule.selector)) return;
+
+        const currentSelector = rule.selector;
+        
+        // Find potential parent selectors
+        const parentSelectors = Array.from(selectorProperties.keys())
+            .filter(selector => {
+                // Check if current selector is a child of this selector
+                return currentSelector.includes(selector) && currentSelector !== selector;
+            });
+
+        rule.walkDecls(decl => {
+            // Only check inheritable properties
+            if (!inheritableProperties.has(decl.prop)) {
+                return;
+            }
+
+            // Check against each parent's properties
+            parentSelectors.forEach(parentSelector => {
+                const parentProps = selectorProperties.get(parentSelector);
+                if (parentProps && parentProps.has(decl.prop)) {
+                    const parentDecls = parentProps.get(decl.prop);
+                    
+                    parentDecls.forEach(parentDecl => {
+                        // Check for redundant inheritance
+                        if (decl.value === parentDecl.value) {
+                            fileErrors.push({
+                                filePath,
+                                line: decl.source.start.line,
+                                message: `Redundant inheritable property "${decl.prop}" inherits same value from parent`,
+                                context: `Parent (${parentSelector}): ${decl.prop}: ${parentDecl.value} (line: ${parentDecl.line})\nChild (${currentSelector}): ${decl.prop}: ${decl.value} (line: ${decl.source.start.line})`,
+                                suggestion: 'Remove redundant property from child as it inherits the same value from parent'
+                            });
+                        }
                     });
                 }
-            }
-            
-            properties.set(prop, decl);
+            });
         });
     });
 }
