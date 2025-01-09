@@ -5,7 +5,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { watch } = require('fs');
 const fs = require('fs').promises;
-const { WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR } = require('./paths');
+const { WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR, JS_DIR } = require('./paths');
 const { purgeStyles } = require('./optimize/purgecss');
 
 console.log(WORKING_DIR, STYLES_DIR, ASSETS_DIR, IMAGES_DIR);
@@ -82,6 +82,7 @@ app.use('/tree', treeRouter);
 app.use('/'+ASSETS_DIR, express.static(path.join(WORKING_DIR, ASSETS_DIR)));
 app.use('/'+IMAGES_DIR, express.static(path.join(WORKING_DIR, IMAGES_DIR)));
 app.use('/'+STYLES_DIR, express.static(path.join(WORKING_DIR, STYLES_DIR)));
+app.use('/'+JS_DIR, express.static(path.join(WORKING_DIR, JS_DIR)));
 
 // Обработка favicon.ico
 app.get('/favicon.ico', (req, res) => {
