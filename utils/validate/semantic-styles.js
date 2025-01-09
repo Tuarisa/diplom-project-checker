@@ -13,9 +13,26 @@ const defaultBlockElements = new Set([
     'nav', 'main', 'form', 'ul', 'ol', 'li'
 ]);
 
-// Function to get line number from location info
-function getLineNumber(node) {
-    return node.__location?.line || 1;
+// Function to get HTML string representation of an element
+function getElementHTML(node) {
+    let html = `<${node.nodeName}`;
+    if (node.attrs) {
+        html += node.attrs.map(attr => ` ${attr.name}="${attr.value}"`).join('');
+    }
+    html += '>';
+    return html;
+}
+
+// Function to get line number from HTML content and element
+function getLineNumber(content, element) {
+    const elementHtml = getElementHTML(element);
+    const lines = content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes(elementHtml)) {
+            return i + 1;
+        }
+    }
+    return 1;
 }
 
 // Function to get class names from element
@@ -53,7 +70,7 @@ async function checkParagraphFontStyles(htmlContent, styleContent, filePath, fil
     
     paragraphs.forEach(paragraph => {
         const classes = getClassNames(paragraph);
-        const lineNumber = getLineNumber(paragraph);
+        const lineNumber = getLineNumber(htmlContent, paragraph);
         
         // Check each class for font-related properties
         classes.forEach(className => {
@@ -69,7 +86,7 @@ async function checkParagraphFontStyles(htmlContent, styleContent, filePath, fil
                             filePath,
                             line: lineNumber,
                             message: `Paragraph element should not have direct font styling. Class: ${className}`,
-                            context: `${decl.prop}: ${decl.value} (${filePath}:${lineNumber})`,
+                            context: `${decl.prop}: ${decl.value} (${filePath}:${lineNumber}) - defined in ${decl.source.input.file}:${decl.source.start.line}`,
                             suggestion: 'Move font styles to a parent element or create a typography class'
                         });
                     }
@@ -158,7 +175,7 @@ function checkPropertyDuplications(content, filePath, fileErrors) {
                         message: prevDecl.value === decl.value ? 
                             `Duplicate property "${prop}" with identical values` :
                             `Property "${prop}" has overlapping values`,
-                        context: `Previous: ${prop}: ${prevDecl.value} (${filePath}:${prevDecl.source.start.line})\nCurrent: ${prop}: ${decl.value} (${filePath}:${decl.source.start.line})`,
+                        context: `Previous: ${prop}: ${prevDecl.value} (${prevDecl.source.input.file}:${prevDecl.source.start.line})\nCurrent: ${prop}: ${decl.value} (${decl.source.input.file}:${decl.source.start.line})`,
                         suggestion: prevDecl.value === decl.value ?
                             'Remove duplicate property' :
                             'Use individual properties instead of shorthand with partial overlap'
