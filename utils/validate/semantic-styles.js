@@ -378,6 +378,258 @@ function isShorthandProperty(prop) {
     ].includes(prop);
 }
 
+// Function to check for CAPS LOCK text
+function checkCapsLockUsage(content, filePath, fileErrors) {
+    const root = postcss.parse(content, { parser: scss });
+    
+    // Regular expression to match 3 or more consecutive uppercase letters
+    const capsLockPattern = /[A-Z]{3,}/;
+    
+    // Check property values
+    root.walkDecls(decl => {
+        if (typeof decl.value === 'string' && capsLockPattern.test(decl.value)) {
+            const match = decl.value.match(capsLockPattern)[0];
+            fileErrors.push({
+                filePath,
+                line: decl.source.start.line,
+                message: `Found CAPS LOCK text "${match}" in CSS value`,
+                context: `${decl.prop}: ${decl.value} (${filePath}:${decl.source.start.line})`,
+                suggestion: 'Use regular case or CSS text-transform property instead of CAPS LOCK'
+            });
+        }
+    });
+    
+    // Check selectors
+    root.walkRules(rule => {
+        if (capsLockPattern.test(rule.selector)) {
+            const match = rule.selector.match(capsLockPattern)[0];
+            fileErrors.push({
+                filePath,
+                line: rule.source.start.line,
+                message: `Found CAPS LOCK text "${match}" in selector`,
+                context: `${rule.selector} (${filePath}:${rule.source.start.line})`,
+                suggestion: 'Use lowercase or camelCase for selectors instead of CAPS LOCK'
+            });
+        }
+    });
+    
+    // Check custom properties and at-rules
+    root.walkAtRules(atRule => {
+        if (capsLockPattern.test(atRule.params)) {
+            const match = atRule.params.match(capsLockPattern)[0];
+            fileErrors.push({
+                filePath,
+                line: atRule.source.start.line,
+                message: `Found CAPS LOCK text "${match}" in at-rule`,
+                context: `@${atRule.name} ${atRule.params} (${filePath}:${atRule.source.start.line})`,
+                suggestion: 'Use regular case instead of CAPS LOCK'
+            });
+        }
+    });
+}
+
+// Function to check active classes on list items
+async function checkActiveClassesOnListItems(htmlContent, filePath, fileErrors) {
+    const document = parse5.parse(htmlContent, { sourceCodeLocationInfo: true });
+
+    function checkNode(node) {
+        if (node.nodeName === 'li') {
+            // Find any nested <a> elements
+            const findNestedAnchors = (n, anchors = []) => {
+                if (n.nodeName === 'a') {
+                    anchors.push(n);
+                }
+                if (n.childNodes) {
+                    n.childNodes.forEach(child => findNestedAnchors(child, anchors));
+                }
+                return anchors;
+            };
+
+            const nestedAnchors = findNestedAnchors(node);
+            const liClasses = getClassNames(node);
+            
+            nestedAnchors.forEach(anchor => {
+                const anchorClasses = getClassNames(anchor);
+                const activeClasses = anchorClasses.filter(className => 
+                    className.toLowerCase().includes('active') || 
+                    className.toLowerCase().includes('current')
+                );
+
+                if (activeClasses.length > 0) {
+                    const anchorLine = anchor.sourceCodeLocation ? anchor.sourceCodeLocation.startLine : 1;
+                    fileErrors.push({
+                        filePath,
+                        line: anchorLine,
+                        message: `Active state class found on <a> element inside <li>`,
+                        context: `Class "${activeClasses.join(', ')}" is applied to <a> element at ${filePath}:${anchorLine}`,
+                        suggestion: `Move the active state class "${activeClasses.join(', ')}" to the parent <li> element for better semantic structure`
+                    });
+                }
+            });
+        }
+
+        if (node.childNodes) {
+            node.childNodes.forEach(checkNode);
+        }
+    }
+
+    checkNode(document);
+}
+
+// Function to check iframe accessibility
+function checkIframeAccessibility(document, filePath, fileErrors) {
+    function checkNode(node) {
+        if (node.nodeName === 'iframe') {
+            const attrs = node.attrs || [];
+            const titleAttr = attrs.find(attr => attr.name === 'title');
+            
+            if (!titleAttr || !titleAttr.value.trim()) {
+                const line = node.sourceCodeLocation ? node.sourceCodeLocation.startLine : 1;
+                fileErrors.push({
+                    filePath,
+                    line,
+                    message: 'Iframe element missing title attribute',
+                    context: `<iframe> element at ${filePath}:${line}`,
+                    suggestion: 'Add a descriptive title attribute to the iframe for better accessibility'
+                });
+            }
+        }
+
+        if (node.childNodes) {
+            node.childNodes.forEach(child => checkNode(child));
+        }
+    }
+
+    checkNode(document);
+}
+
+// Function to check form elements accessibility
+function checkFormElementsAccessibility(document, filePath, fileErrors) {
+    const formElements = new Set(['input', 'textarea', 'select']);
+    const inputTypesRequiringLabel = new Set([
+        'text', 'password', 'email', 'tel', 'url', 'search',
+        'number', 'date', 'datetime-local', 'time', 'week',
+        'month', 'color', 'file', 'range', 'hidden'
+    ]);
+    
+    // First, collect all labels and their associated 'for' attributes
+    const labelForIds = new Set();
+    function collectLabels(node) {
+        if (node.nodeName === 'label') {
+            const attrs = node.attrs || [];
+            const forAttr = attrs.find(attr => attr.name === 'for');
+            if (forAttr && forAttr.value) {
+                labelForIds.add(forAttr.value);
+            }
+            
+            // Check if label has nested input (implicit association)
+            let hasNestedInput = false;
+            const checkForNestedInput = (n) => {
+                if (formElements.has(n.nodeName)) {
+                    hasNestedInput = true;
+                }
+                if (n.childNodes) {
+                    n.childNodes.forEach(checkForNestedInput);
+                }
+            };
+            
+            if (node.childNodes) {
+                node.childNodes.forEach(checkForNestedInput);
+            }
+            
+            if (!forAttr && !hasNestedInput) {
+                const line = node.sourceCodeLocation ? node.sourceCodeLocation.startLine : 1;
+                fileErrors.push({
+                    filePath,
+                    line,
+                    message: 'Label element without association to form control',
+                    context: `<label> element at ${filePath}:${line}`,
+                    suggestion: 'Add "for" attribute to label or nest form control inside the label'
+                });
+            }
+        }
+        
+        if (node.childNodes) {
+            node.childNodes.forEach(collectLabels);
+        }
+    }
+    
+    // Then check all form elements
+    function checkFormElement(node) {
+        if (formElements.has(node.nodeName)) {
+            const attrs = node.attrs || [];
+            const idAttr = attrs.find(attr => attr.name === 'id');
+            const typeAttr = attrs.find(attr => attr.name === 'type');
+            const type = typeAttr ? typeAttr.value.toLowerCase() : 'text';
+            
+            // Skip only submit and button types
+            if (node.nodeName === 'input' && (type === 'submit' || type === 'button')) {
+                return;
+            }
+            
+            // Check if element has an associated label
+            let hasLabel = false;
+            let hasAriaLabel = false;
+            
+            // Check for label association via 'id'
+            if (idAttr && labelForIds.has(idAttr.value)) {
+                hasLabel = true;
+            }
+            
+            // Check for aria-label or aria-labelledby
+            const ariaLabel = attrs.find(attr => attr.name === 'aria-label');
+            const ariaLabelledby = attrs.find(attr => attr.name === 'aria-labelledby');
+            if ((ariaLabel && ariaLabel.value.trim()) || 
+                (ariaLabelledby && ariaLabelledby.value.trim())) {
+                hasAriaLabel = true;
+            }
+            
+            // Check if element is nested within a label
+            let parent = node.parentNode;
+            while (parent) {
+                if (parent.nodeName === 'label') {
+                    hasLabel = true;
+                    break;
+                }
+                parent = parent.parentNode;
+            }
+            
+            const line = node.sourceCodeLocation ? node.sourceCodeLocation.startLine : 1;
+            
+            // Report error if no proper label is found
+            if (!hasLabel) {
+                fileErrors.push({
+                    filePath,
+                    line,
+                    message: `Form element <${node.nodeName}> missing associated label`,
+                    context: `<${node.nodeName}> element at ${filePath}:${line}`,
+                    suggestion: 'Add a label element with matching "for" attribute or nest the element inside a label'
+                });
+            }
+            
+            // Report separate warning if ARIA is used instead of label
+            if (!hasLabel && hasAriaLabel) {
+                fileErrors.push({
+                    filePath,
+                    line,
+                    message: `Form element using ARIA attributes instead of proper label`,
+                    context: `<${node.nodeName}> element at ${filePath}:${line} uses ARIA for labeling`,
+                    suggestion: 'Replace ARIA labeling with proper <label> element for better accessibility'
+                });
+            }
+        }
+        
+        if (node.childNodes) {
+            node.childNodes.forEach(checkFormElement);
+        }
+    }
+    
+    // First collect all labels
+    collectLabels(document);
+    // Then check all form elements
+    checkFormElement(document);
+}
+
 async function validateSemanticStyles() {
     try {
         const styleFiles = await fs.readdir(resolveStylesPath());
@@ -424,6 +676,40 @@ async function validateSemanticStyles() {
 
             // Run HTML-specific checks
             await checkParagraphFontStyles(htmlContent, styleContent, htmlPath, fileErrors);
+            await checkActiveClassesOnListItems(htmlContent, htmlPath, fileErrors);
+            
+            // Parse HTML once for all checks
+            const document = parse5.parse(htmlContent, { sourceCodeLocationInfo: true });
+            
+            // Run accessibility checks
+            checkIframeAccessibility(document, htmlPath, fileErrors);
+            checkFormElementsAccessibility(document, htmlPath, fileErrors);
+            
+            // Check HTML content for CAPS LOCK
+            function checkNodeText(node) {
+                if (node.nodeName === '#text' && node.value) {
+                    const capsLockPattern = /[A-Z]{3,}/;
+                    if (capsLockPattern.test(node.value)) {
+                        const match = node.value.match(capsLockPattern)[0];
+                        const parentElement = node.parentNode;
+                        if (parentElement && parentElement.sourceCodeLocation) {
+                            fileErrors.push({
+                                filePath: htmlPath,
+                                line: parentElement.sourceCodeLocation.startLine,
+                                message: `Found CAPS LOCK text "${match}" in HTML content`,
+                                context: `Text content: "${node.value.trim()}" (${htmlPath}:${parentElement.sourceCodeLocation.startLine})`,
+                                suggestion: 'Use regular case and CSS text-transform property instead of CAPS LOCK'
+                            });
+                        }
+                    }
+                }
+                
+                if (node.childNodes) {
+                    node.childNodes.forEach(checkNodeText);
+                }
+            }
+            
+            checkNodeText(document);
         }
 
         // Log all errors
