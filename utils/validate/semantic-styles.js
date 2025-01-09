@@ -136,13 +136,79 @@ async function checkParagraphFontStyles(htmlContent, styleContent, filePath, fil
 }
 
 // Function to check default property overrides
-function checkDefaultPropertyOverrides(content, filePath, fileErrors) {
+async function checkDefaultPropertyOverrides(content, filePath, fileErrors, htmlFiles) {
     const root = postcss.parse(content, { parser: scss });
-    
+    const classesWithDisplayBlock = new Map(); // Map to store classes with display: block
+
+    // First pass: collect all classes that set display: block
+    root.walkRules(rule => {
+        if (hasPseudoElementsOrClasses(rule.selector)) return;
+
+        rule.walkDecls(decl => {
+            if (decl.prop === 'display' && decl.value === 'block') {
+                // Extract class names from the selector
+                const classNames = rule.selector
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.startsWith('.'))
+                    .map(s => s.split(' ')[0].substring(1)); // Get the first class name
+
+                classNames.forEach(className => {
+                    if (!classesWithDisplayBlock.has(className)) {
+                        classesWithDisplayBlock.set(className, {
+                            line: decl.source.start.line,
+                            filePath: filePath
+                        });
+                    }
+                });
+            }
+        });
+    });
+
+    // If we found any display: block declarations, check HTML files
+    if (classesWithDisplayBlock.size > 0) {
+        for (const htmlFile of htmlFiles) {
+            const htmlContent = await fs.readFile(htmlFile, 'utf8');
+            const document = parse5.parse(htmlContent, { sourceCodeLocationInfo: true });
+
+            // Function to check elements recursively
+            function checkElement(node) {
+                if (node.nodeName && defaultBlockElements.has(node.nodeName)) {
+                    // Get classes of this element
+                    const classNames = getClassNames(node);
+                    
+                    // Check if any of these classes sets display: block
+                    classNames.forEach(className => {
+                        if (classesWithDisplayBlock.has(className)) {
+                            const { line, filePath: styleFilePath } = classesWithDisplayBlock.get(className);
+                            const elementLine = node.sourceCodeLocation ? node.sourceCodeLocation.startLine : 1;
+                            
+                            fileErrors.push({
+                                filePath: styleFilePath,
+                                line: line,
+                                message: `Unnecessary display: block on naturally block-level element <${node.nodeName}>`,
+                                context: `Style defined in ${styleFilePath}:${line} is applied to <${node.nodeName}> in ${htmlFile}:${elementLine}`,
+                                suggestion: `Remove redundant display: block from class '${className}' as <${node.nodeName}> is block by default`
+                            });
+                        }
+                    });
+                }
+
+                // Check child elements
+                if (node.childNodes) {
+                    node.childNodes.forEach(checkElement);
+                }
+            }
+
+            checkElement(document);
+        }
+    }
+
+    // Original check for direct element selectors
     root.walkRules(rule => {
         const selector = rule.selector.toLowerCase();
         
-        // Check if rule targets default block elements
+        // Check if rule directly targets default block elements
         defaultBlockElements.forEach(element => {
             if (selector.includes(`${element}[`) || selector === element || selector.startsWith(`${element}.`)) {
                 rule.walkDecls(decl => {
@@ -319,6 +385,11 @@ async function validateSemanticStyles() {
         const allErrors = [];
         const fileErrorsMap = new Map();
 
+        // Get full paths for HTML files
+        const htmlFilePaths = htmlFiles
+            .filter(f => f.endsWith('.html'))
+            .map(f => resolveHtmlPath(f));
+
         // Process style files
         for (const file of styleFiles.filter(f => f.endsWith('.scss') || f.endsWith('.css'))) {
             const filePath = resolveStylesPath(file);
@@ -330,7 +401,7 @@ async function validateSemanticStyles() {
             const fileErrors = fileErrorsMap.get(filePath);
 
             // Run style-specific checks
-            checkDefaultPropertyOverrides(content, filePath, fileErrors);
+            await checkDefaultPropertyOverrides(content, filePath, fileErrors, htmlFilePaths);
             checkPropertyDuplications(content, filePath, fileErrors);
         }
 
