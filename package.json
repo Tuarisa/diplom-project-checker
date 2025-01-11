@@ -16,7 +16,8 @@
     "optimize:html": "node utils/optimize/html.js",
     "optimize:styles": "node utils/optimize/styles.js",
     "optimize:images": "node utils/optimize/images.js",
-    "optimize": "yarn optimize:html && yarn optimize:styles && yarn optimize:images",
+    "optimize:typo": "node utils/optimize/typography.js",
+    "optimize": "yarn optimize:html && yarn optimize:styles && yarn optimize:images && yarn optimize:typo",
     "sass": "node -e \"const { WORKING_DIR } = require('./utils/paths'); require('child_process').execSync(`sass ${WORKING_DIR}/styles/style.scss ${WORKING_DIR}/assets/styles/style.css && cleancss -o ${WORKING_DIR}/assets/styles/style.min.css ${WORKING_DIR}/assets/styles/style.css && cleancss -o ${WORKING_DIR}/assets/styles/normalize.min.css ${WORKING_DIR}/styles/normalize.css`, {stdio: 'inherit'})\"",
     "sass:watch": "node -e \"const { WORKING_DIR } = require('./utils/paths'); const path = require('path'); process.chdir(WORKING_DIR); require('child_process').spawn('sass', ['--watch', 'styles/style.scss', 'assets/styles/style.css'], {stdio: 'inherit'})\"",
     "format:styles": "node utils/format-styles.js",
@@ -43,10 +44,11 @@
     "normalize.css": "^8.0.1",
     "parse5": "^7.1.2",
     "prettier": "^3.1.1",
+    "purgecss": "^5.0.0",
     "sass": "^1.69.5",
     "sharp": "^0.33.1",
     "svg-sprite": "^2.0.4",
-    "purgecss": "^5.0.0"
+    "typograf": "^7.4.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
