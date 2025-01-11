@@ -2,9 +2,9 @@ const Typograf = require('typograf');
 const fs = require('fs').promises;
 const { WORKING_DIR, resolveWorkingPath } = require('../paths');
 
-// Create Typograf instance with Russian and English languages
+// Create Typograf instance with English as primary language
 const tp = new Typograf({ 
-    locale: ['ru', 'en-US'],
+    locale: ['en-US'],
     htmlEntity: { type: 'digit' },
     safeTags: [
         ['<!DOCTYPE>', '</!DOCTYPE>'],
@@ -28,7 +28,7 @@ const tp = new Typograf({
     ]
 });
 
-// Enable necessary rules
+// Enable English typography rules
 tp.enableRule('common/space/afterPunctuation');
 tp.enableRule('common/space/beforeBracket');
 tp.enableRule('common/space/afterBracket');
@@ -36,24 +36,14 @@ tp.enableRule('common/punctuation/quote');
 tp.enableRule('common/space/delTrailingBlanks');
 tp.enableRule('common/space/trimLeft');
 tp.enableRule('common/space/trimRight');
-tp.enableRule('ru/dash/main');
-tp.enableRule('ru/dash/centuries');
-tp.enableRule('ru/dash/months');
-tp.enableRule('ru/dash/time');
-tp.enableRule('ru/dash/de');
-tp.enableRule('ru/dash/surname');
-tp.enableRule('ru/dash/years');
-tp.enableRule('ru/punctuation/quot');
-tp.enableRule('ru/other/phone-number');
-tp.enableRule('ru/date/main');
-tp.enableRule('ru/money/ruble');
-tp.enableRule('ru/nbsp/afterNumber');
-tp.enableRule('ru/nbsp/beforeParticle');
-tp.enableRule('ru/nbsp/centuries');
-tp.enableRule('ru/nbsp/dayMonth');
-tp.enableRule('ru/nbsp/afterParticle');
-tp.enableRule('ru/nbsp/years');
-tp.enableRule('ru/number/ordinals');
+tp.enableRule('common/number/fraction');
+tp.enableRule('common/number/mathSigns');
+tp.enableRule('common/number/times');
+tp.enableRule('common/other/repeatWord');
+tp.enableRule('en-US/dash/main');
+tp.enableRule('en-US/punctuation/quote');
+tp.enableRule('en-US/punctuation/apostrophe');
+tp.enableRule('en-US/typo/quotation');
 
 // Disable HTML-specific rules that might cause issues
 tp.disableRule('common/html/stripTags');
