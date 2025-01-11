@@ -6,6 +6,109 @@ const autoprefixer = require('autoprefixer');
 const { WORKING_DIR, STYLES_DIR, resolveWorkingPath, resolveStylesPath } = require('../paths');
 const { logValidationErrors } = require('../validation-logger');
 
+// Function to check selector nesting depth
+function checkSelectorNestingDepth(selector) {
+    // Skip validation for specific state-related selectors
+    const statePatterns = [
+        /:checked/,
+        /:focused/,
+        /:focus/,
+        /:selected/,
+        /:active/,
+        /:disabled/,
+        /--checked/,
+        /--focused/,
+        /--selected/,
+        /--active/,
+        /--disabled/,
+        /\[checked\]/,
+        /\[aria-checked\]/,
+        /\[aria-selected\]/,
+        /\[aria-expanded\]/,
+        /\[disabled\]/,
+        /\[aria-disabled\]/,
+        /\.is-checked/,
+        /\.is-focused/,
+        /\.is-selected/,
+        /\.is-expanded/,
+        /\.is-active/,
+        /\.is-disabled/
+    ];
+
+    // If selector contains any of the state patterns, skip depth validation
+    if (statePatterns.some(pattern => pattern.test(selector))) {
+        return 0; // Return 0 to skip validation for these cases
+    }
+
+    // Remove pseudo-classes, pseudo-elements and clean up combinators
+    const cleanSelector = selector
+        .replace(/:[a-zA-Z-]+(?:\([^)]*\))?/g, '') // Remove pseudo-classes
+        .replace(/:{1,2}[a-zA-Z-]+/g, '') // Remove pseudo-elements
+        .replace(/\s*[+>~]\s*/g, ' ') // Replace combinators with spaces
+        .trim();
+    
+    // Split by spaces and filter out empty strings and combinators
+    const parts = cleanSelector
+        .split(' ')
+        .filter(part => part.length > 0 && !['>', '+', '~'].includes(part));
+    
+    // Count BEM elements (double underscore) as nesting level
+    const bemNestingLevel = (selector.match(/__/g) || []).length;
+    
+    // Count space-separated parts as nesting level
+    const spaceNestingLevel = Math.max(0, parts.length - 1);
+    
+    // Return the maximum of BEM nesting and space nesting
+    return Math.max(bemNestingLevel, spaceNestingLevel);
+}
+
+// Function to check selectors nesting
+function checkSelectorsNesting(content, filePath, fileErrors) {
+    const MAX_NESTING_DEPTH = 2;
+    let currentSelector = '';
+    let inBlock = false;
+    let blockStart = 0;
+    
+    const lines = content.split('\n');
+    
+    lines.forEach((line, index) => {
+        const lineNumber = index + 1;
+        const trimmedLine = line.trim();
+
+        // Skip comments
+        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+            return;
+        }
+
+        // Find selectors
+        if (trimmedLine.includes('{')) {
+            currentSelector = trimmedLine.replace('{', '').trim();
+            blockStart = lineNumber;
+            inBlock = true;
+
+            // Split multiple selectors (separated by commas)
+            const selectors = currentSelector.split(',').map(s => s.trim());
+            
+            selectors.forEach(selector => {
+                const nestingDepth = checkSelectorNestingDepth(selector);
+                if (nestingDepth > MAX_NESTING_DEPTH) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: `Selector nesting depth (${nestingDepth}) exceeds maximum allowed (${MAX_NESTING_DEPTH})`,
+                        context: selector,
+                        suggestion: 'Consider refactoring to reduce nesting depth. Use BEM modifiers or separate classes instead of deep nesting.'
+                    });
+                }
+            });
+        }
+
+        if (trimmedLine === '}') {
+            inBlock = false;
+        }
+    });
+}
+
 // Функция для проверки интерактивных элементов
 function checkInteractiveElements(content, filePath, fileErrors) {
     const lines = content.split('\n');
@@ -112,30 +215,36 @@ function checkBackgroundProperties(content, filePath, fileErrors) {
     let backgroundImageLine = 0;
     let currentSelector = '';
     let inBlock = false;
+    let isSvgBackground = false;
 
     lines.forEach((line, index) => {
         const lineNumber = index + 1;
         const trimmedLine = line.trim();
 
-        // Пропускаем комментарии
+        // Skip comments
         if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
             return;
         }
 
-        // Находим начало блока
+        // Find block start
         if (trimmedLine.includes('{')) {
             currentSelector = trimmedLine.replace('{', '').trim();
             inBlock = true;
             hasBackgroundImage = false;
             hasBackgroundColor = false;
+            isSvgBackground = false;
         }
 
-        // Проверяем свойства внутри блока
+        // Check properties inside block
         if (inBlock) {
             if (trimmedLine.includes('background-image') || 
                 (trimmedLine.includes('background:') && trimmedLine.includes('url('))) {
                 hasBackgroundImage = true;
                 backgroundImageLine = lineNumber;
+                // Check if it's an SVG background
+                if (trimmedLine.includes('.svg')) {
+                    isSvgBackground = true;
+                }
             }
             if (trimmedLine.includes('background-color') || 
                 (trimmedLine.includes('background:') && /:#?[0-9a-f]{3,8}|rgba?\(|hsla?\(/.test(trimmedLine))) {
@@ -143,9 +252,9 @@ function checkBackgroundProperties(content, filePath, fileErrors) {
             }
         }
 
-        // Конец блока - проверяем результаты
+        // End of block - check results
         if (trimmedLine === '}') {
-            if (hasBackgroundImage && !hasBackgroundColor) {
+            if (hasBackgroundImage && !hasBackgroundColor && !isSvgBackground) {
                 fileErrors.push({
                     filePath,
                     line: backgroundImageLine,
@@ -226,6 +335,91 @@ function checkCommentedCode(content, filePath, fileErrors) {
     });
 }
 
+// Function to check color formats
+function checkColorFormats(content, filePath, fileErrors) {
+    const lines = content.split('\n');
+    let inBlock = false;
+    let currentSelector = '';
+
+    // Pattern for color properties
+    const colorProps = [
+        'color',
+        'background-color',
+        'border-color',
+        'outline-color',
+        'box-shadow',
+        'text-shadow'
+    ];
+
+    // Pattern for named colors
+    const namedColors = /\b(red|blue|green|yellow|white|black|gray|purple|orange|pink|brown|violet|indigo|gold|silver|bronze|navy|olive|teal|maroon|aqua|lime|fuchsia)\b/i;
+
+    lines.forEach((line, index) => {
+        const lineNumber = index + 1;
+        const trimmedLine = line.trim();
+
+        // Skip comments
+        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+            return;
+        }
+
+        // Find block start
+        if (trimmedLine.includes('{')) {
+            currentSelector = trimmedLine.replace('{', '').trim();
+            inBlock = true;
+        }
+
+        // Check properties inside block
+        if (inBlock) {
+            // Skip if line contains gradient or CSS variable
+            if (trimmedLine.includes('gradient') || trimmedLine.includes('var(')) {
+                return;
+            }
+
+            // Check for color properties
+            if (colorProps.some(prop => trimmedLine.includes(prop + ':'))) {
+                // Check for rgba/rgb format when not needed
+                if (trimmedLine.includes('rgb') && !trimmedLine.includes('rgba')) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Use HEX format instead of rgb()',
+                        context: trimmedLine,
+                        suggestion: 'Convert rgb() to HEX color format for consistency'
+                    });
+                }
+
+                // Check for named colors only if not inside a CSS variable
+                const hasNamedColor = namedColors.test(trimmedLine);
+                if (hasNamedColor && !trimmedLine.includes('var(--color-')) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Use HEX format instead of named color',
+                        context: trimmedLine,
+                        suggestion: 'Convert named color to HEX color format for consistency'
+                    });
+                }
+
+                // Check for HSL format
+                if (trimmedLine.includes('hsl')) {
+                    fileErrors.push({
+                        filePath,
+                        line: lineNumber,
+                        message: 'Use HEX format instead of hsl()/hsla()',
+                        context: trimmedLine,
+                        suggestion: 'Convert HSL color to HEX color format for consistency'
+                    });
+                }
+            }
+        }
+
+        if (trimmedLine === '}') {
+            inBlock = false;
+        }
+    });
+}
+
 async function validateStyles() {
     try {
         const files = await fs.readdir(resolveStylesPath());
@@ -246,6 +440,12 @@ async function validateStyles() {
                 fileErrorsMap.set(fullPath, []);
             }
             const fileErrors = fileErrorsMap.get(fullPath);
+
+            // Add color format check
+            checkColorFormats(content, fullPath, fileErrors);
+
+            // Add new nesting check
+            checkSelectorsNesting(content, fullPath, fileErrors);
 
             // Stylelint validation
             const stylelintResult = await stylelint.lint({
