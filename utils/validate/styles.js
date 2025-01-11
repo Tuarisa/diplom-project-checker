@@ -8,58 +8,47 @@ const { logValidationErrors } = require('../validation-logger');
 
 // Function to check selector nesting depth
 function checkSelectorNestingDepth(selector) {
-    // Skip validation for specific state-related selectors
-    const statePatterns = [
-        /:checked/,
-        /:focused/,
-        /:focus/,
-        /:selected/,
-        /:active/,
-        /:disabled/,
-        /--checked/,
-        /--focused/,
-        /--selected/,
-        /--active/,
-        /--disabled/,
-        /\[checked\]/,
-        /\[aria-checked\]/,
-        /\[aria-selected\]/,
-        /\[aria-expanded\]/,
-        /\[disabled\]/,
-        /\[aria-disabled\]/,
-        /\.is-checked/,
-        /\.is-focused/,
-        /\.is-selected/,
-        /\.is-expanded/,
-        /\.is-active/,
-        /\.is-disabled/
-    ];
-
-    // If selector contains any of the state patterns, skip depth validation
-    if (statePatterns.some(pattern => pattern.test(selector))) {
-        return 0; // Return 0 to skip validation for these cases
+    // Remove parent references and clean up spaces
+    selector = selector.replace(/&/g, '').trim();
+    
+    // Split by commas for multiple selectors
+    const selectors = selector.split(',').map(s => s.trim());
+    
+    let maxDepth = 0;
+    
+    for (const singleSelector of selectors) {
+        // Split by spaces and filter out empty parts
+        const parts = singleSelector
+            .split(/\s+/)
+            .filter(part => part && !part.match(/^[+>~]$/));
+            
+        let depth = 0;
+        let bemElements = 0;
+        
+        for (const part of parts) {
+            // Skip if it's just a combinator
+            if (part.match(/^[+>~]$/)) continue;
+            
+            // Count BEM elements
+            const bemMatches = part.match(/__/g);
+            if (bemMatches) {
+                bemElements += bemMatches.length;
+            }
+            
+            // Skip if it's a BEM modifier
+            if (part.includes('--')) continue;
+            
+            // Count pseudo-elements as separate levels
+            const hasPseudoElement = part.match(/:{1,2}(before|after|placeholder|backdrop|marker|spelling|grammar|selection|first-line|first-letter|file-selector-button|marker|placeholder-shown|cue|part|slotted)/);
+            
+            depth++;
+            if (hasPseudoElement) depth++;
+        }
+        
+        maxDepth = Math.max(maxDepth, Math.max(depth, bemElements));
     }
-
-    // Remove pseudo-classes, pseudo-elements and clean up combinators
-    const cleanSelector = selector
-        .replace(/:[a-zA-Z-]+(?:\([^)]*\))?/g, '') // Remove pseudo-classes
-        .replace(/:{1,2}[a-zA-Z-]+/g, '') // Remove pseudo-elements
-        .replace(/\s*[+>~]\s*/g, ' ') // Replace combinators with spaces
-        .trim();
     
-    // Split by spaces and filter out empty strings and combinators
-    const parts = cleanSelector
-        .split(' ')
-        .filter(part => part.length > 0 && !['>', '+', '~'].includes(part));
-    
-    // Count BEM elements (double underscore) as nesting level
-    const bemNestingLevel = (selector.match(/__/g) || []).length;
-    
-    // Count space-separated parts as nesting level
-    const spaceNestingLevel = Math.max(0, parts.length - 1);
-    
-    // Return the maximum of BEM nesting and space nesting
-    return Math.max(bemNestingLevel, spaceNestingLevel);
+    return maxDepth;
 }
 
 // Function to check selectors nesting
