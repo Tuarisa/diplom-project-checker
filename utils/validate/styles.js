@@ -231,9 +231,9 @@ function checkBackgroundProperties(content, filePath, fileErrors) {
                 hasBackgroundImage = true;
                 backgroundImageLine = lineNumber;
                 // Check if it's an SVG background
-                if (trimmedLine.includes('.svg')) {
-                    isSvgBackground = true;
-                }
+                // if (trimmedLine.includes('.svg')) {
+                //     isSvgBackground = true;
+                // }
             }
             if (trimmedLine.includes('background-color') || 
                 (trimmedLine.includes('background:') && /:#?[0-9a-f]{3,8}|rgba?\(|hsla?\(/.test(trimmedLine))) {
